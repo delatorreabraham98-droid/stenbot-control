@@ -1,0 +1,57 @@
+{
+  "name": "Message",
+  "type": "object",
+  "properties": {
+    "conversation_id": {
+      "type": "string"
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "inbound",
+        "outbound"
+      ]
+    },
+    "sender_type": {
+      "type": "string",
+      "enum": [
+        "customer",
+        "bot",
+        "human"
+      ]
+    },
+    "message_text": {
+      "type": "string"
+    },
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "image",
+        "audio",
+        "document",
+        "error"
+      ],
+      "default": "text"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "sent",
+        "delivered",
+        "read",
+        "failed"
+      ],
+      "default": "sent"
+    },
+    "raw_payload": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "conversation_id",
+    "direction",
+    "sender_type",
+    "message_text"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "name": "Channel",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "bot_id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "whatsapp",
+        "instagram",
+        "messenger"
+      ]
+    },
+    "meta_business_id": {
+      "type": "string"
+    },
+    "phone_number_id": {
+      "type": "string"
+    },
+    "page_id": {
+      "type": "string"
+    },
+    "instagram_business_account_id": {
+      "type": "string"
+    },
+    "webhook_verify_token": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "inactive",
+        "error"
+      ],
+      "default": "inactive"
+    }
+  },
+  "required": [
+    "client_id",
+    "bot_id",
+    "type"
+  ]
+}

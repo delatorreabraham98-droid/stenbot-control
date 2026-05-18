@@ -1,0 +1,58 @@
+{
+  "name": "Conversation",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "channel_id": {
+      "type": "string"
+    },
+    "external_user_id": {
+      "type": "string"
+    },
+    "customer_name": {
+      "type": "string"
+    },
+    "customer_phone": {
+      "type": "string"
+    },
+    "channel_type": {
+      "type": "string",
+      "enum": [
+        "whatsapp",
+        "instagram",
+        "messenger"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "bot_active",
+        "needs_human",
+        "closed"
+      ],
+      "default": "open"
+    },
+    "last_message_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "last_message_preview": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "message_count": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "client_id",
+    "channel_id",
+    "external_user_id"
+  ]
+}

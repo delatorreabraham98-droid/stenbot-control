@@ -1,0 +1,39 @@
+{
+  "name": "KnowledgeItem",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "content": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "faq",
+        "product",
+        "pricing",
+        "policy",
+        "schedule",
+        "warranty",
+        "installation",
+        "wholesale",
+        "other"
+      ],
+      "default": "faq"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "client_id",
+    "title",
+    "content"
+  ]
+}

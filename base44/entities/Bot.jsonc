@@ -1,0 +1,44 @@
+{
+  "name": "Bot",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "ID del cliente due\u00f1o del bot"
+    },
+    "name": {
+      "type": "string"
+    },
+    "bot_personality": {
+      "type": "string",
+      "description": "Personalidad y tono del bot"
+    },
+    "business_context": {
+      "type": "string",
+      "description": "Contexto del negocio para el bot"
+    },
+    "default_language": {
+      "type": "string",
+      "enum": [
+        "es",
+        "en"
+      ],
+      "default": "es"
+    },
+    "timezone": {
+      "type": "string",
+      "default": "America/Tijuana"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    },
+    "human_escalation_message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "client_id",
+    "name"
+  ]
+}

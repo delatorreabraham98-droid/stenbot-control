@@ -1,0 +1,52 @@
+{
+  "name": "Lead",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "conversation_id": {
+      "type": "string"
+    },
+    "customer_name": {
+      "type": "string"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "product_interest": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "requires_installation": {
+      "type": "boolean",
+      "default": false
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "new",
+        "contacted",
+        "quoted",
+        "won",
+        "lost"
+      ],
+      "default": "new"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "estimated_value": {
+      "type": "number"
+    }
+  },
+  "required": [
+    "client_id",
+    "customer_name"
+  ]
+}

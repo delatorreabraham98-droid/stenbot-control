@@ -1,0 +1,46 @@
+{
+  "name": "Client",
+  "type": "object",
+  "properties": {
+    "business_name": {
+      "type": "string",
+      "description": "Nombre del negocio"
+    },
+    "contact_name": {
+      "type": "string",
+      "description": "Nombre del contacto"
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "cancelled"
+      ],
+      "default": "active"
+    },
+    "plan": {
+      "type": "string",
+      "enum": [
+        "starter",
+        "pro",
+        "enterprise"
+      ],
+      "default": "starter"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "business_name",
+    "email"
+  ]
+}
