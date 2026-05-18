@@ -2,6 +2,10 @@
   "name": "Message",
   "type": "object",
   "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "ID del cliente due\u00f1o de la conversaci\u00f3n"
+    },
     "conversation_id": {
       "type": "string"
     },
