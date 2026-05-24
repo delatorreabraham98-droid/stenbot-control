@@ -22,6 +22,8 @@ export default function Conversations() {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterClient, setFilterClient] = useState('all');
+  const [replyText, setReplyText] = useState('');
+  const [sending, setSending] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -39,6 +41,29 @@ export default function Conversations() {
     const msgs = await base44.entities.Message.filter({ conversation_id: conv.id }, 'created_date', 100);
     setMessages(msgs);
     setLoadingMessages(false);
+  };
+
+  const sendReply = async () => {
+    if (!replyText.trim() || !selected) return;
+    setSending(true);
+    await base44.entities.Message.create({
+      conversation_id: selected.id,
+      client_id: selected.client_id,
+      direction: 'outbound',
+      sender_type: 'human',
+      message_text: replyText.trim(),
+      message_type: 'text',
+      status: 'sent',
+    });
+    await base44.entities.Conversation.update(selected.id, {
+      last_message_at: new Date().toISOString(),
+      last_message_preview: replyText.trim(),
+      message_count: (selected.message_count || 0) + 1,
+    });
+    setReplyText('');
+    setSending(false);
+    loadMessages(selected);
+    load();
   };
 
   const updateStatus = async (convId, status) => {
@@ -158,7 +183,7 @@ export default function Conversations() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3" id="messages-container">
               {loadingMessages ? (
                 <div className="space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className={cn("h-12 bg-muted animate-pulse rounded-2xl w-3/4", i % 2 === 0 ? "ml-auto" : "")} />)}</div>
               ) : messages.length === 0 ? (
@@ -180,6 +205,21 @@ export default function Conversations() {
                   </div>
                 ))
               )}
+            </div>
+
+            {/* Reply Box */}
+            <div className="px-4 py-3 border-t border-border flex gap-2 items-end">
+              <textarea
+                className="flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring min-h-[40px] max-h-28"
+                rows={1}
+                placeholder="Escribe una respuesta..."
+                value={replyText}
+                onChange={e => setReplyText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
+              />
+              <Button size="icon" onClick={sendReply} disabled={sending || !replyText.trim()} className="h-9 w-9 flex-shrink-0">
+                <Send className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         ) : (
