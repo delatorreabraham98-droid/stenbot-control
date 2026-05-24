@@ -6,6 +6,10 @@
       "type": "string",
       "description": "ID del cliente due\u00f1o del bot"
     },
+    "client_email": {
+      "type": "string",
+      "format": "email"
+    },
     "name": {
       "type": "string"
     },
@@ -43,14 +47,24 @@
   ],
   "rls": {
     "create": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
     },
     "read": {
       "$or": [
         {
           "created_by": "{{user.email}}"
+        },
+        {
+          "data.client_email": "{{user.email}}"
         },
         {
           "user_condition": {
@@ -63,6 +77,9 @@
       "$or": [
         {
           "created_by": "{{user.email}}"
+        },
+        {
+          "data.client_email": "{{user.email}}"
         },
         {
           "user_condition": {

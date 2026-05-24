@@ -14,7 +14,7 @@ import ContextImporter from '@/components/bots/ContextImporter';
 import { toast } from 'sonner';
 
 const emptyForm = {
-  client_id: '', name: '', bot_personality: '', business_context: '',
+  client_id: '', client_email: '', name: '', bot_personality: '', business_context: '',
   default_language: 'es', timezone: 'America/Tijuana', active: true,
   human_escalation_message: 'Un asesor te atenderá en breve. ¡Gracias por tu paciencia!'
 };
@@ -121,7 +121,10 @@ export default function Bots() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Cliente *</Label>
-                <Select value={form.client_id} onValueChange={v => setForm(f => ({ ...f, client_id: v }))}>
+                <Select value={form.client_id} onValueChange={v => {
+                  const c = clients.find(cl => cl.id === v);
+                  setForm(f => ({ ...f, client_id: v, client_email: c?.email || '' }));
+                }}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
                   <SelectContent>
                     {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}

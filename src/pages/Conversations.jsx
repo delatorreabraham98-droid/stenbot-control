@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { MessageSquare, Search, AlertTriangle, X, ChevronRight, Send, UserCheck } from 'lucide-react';
 import WhatsAppReplyModal from '@/components/conversations/WhatsAppReplyModal';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 export default function Conversations() {
+  const { isAdmin, clientProfile } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [messages, setMessages] = useState([]);
   const [clients, setClients] = useState([]);
@@ -22,20 +24,28 @@ export default function Conversations() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [filterClient, setFilterClient] = useState('all');
+  const [filterClient, setFilterClient] = useState(isAdmin ? 'all' : clientProfile?.id || 'all');
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
-  const [replyModal, setReplyModal] = useState(null); // conversation to reply to
+  const [replyModal, setReplyModal] = useState(null);
+
+  const clientId = isAdmin ? null : clientProfile?.id;
 
   const load = () => {
     setLoading(true);
-    Promise.all([
-      base44.entities.Conversation.list('-last_message_at', 200),
-      base44.entities.Client.list('-created_date', 200),
-    ]).then(([conv, cl]) => { setConversations(conv); setClients(cl); }).finally(() => setLoading(false));
+    const promises = [base44.entities.Conversation.list('-last_message_at', 200)];
+
+    if (isAdmin) {
+      promises.push(base44.entities.Client.list('-created_date', 200));
+    }
+
+    Promise.all(promises).then(([conv, cl]) => {
+      setConversations(conv);
+      if (cl) setClients(cl);
+    }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [isAdmin, clientProfile?.id]);
 
   const loadMessages = async (conv) => {
     setSelected(conv);
@@ -88,7 +98,7 @@ export default function Conversations() {
   const filtered = conversations.filter(c => {
     const matchSearch = !search || c.customer_name?.toLowerCase().includes(search.toLowerCase()) || c.external_user_id?.includes(search);
     const matchStatus = filterStatus === 'all' || c.status === filterStatus;
-    const matchClient = filterClient === 'all' || c.client_id === filterClient;
+    const matchClient = clientId ? c.client_id === clientId : (filterClient === 'all' || c.client_id === filterClient);
     return matchSearch && matchStatus && matchClient;
   });
 
@@ -117,13 +127,15 @@ export default function Conversations() {
             <SelectItem value="closed">Cerrada</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={filterClient} onValueChange={setFilterClient}>
-          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los clientes</SelectItem>
-            {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {isAdmin && (
+          <Select value={filterClient} onValueChange={setFilterClient}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los clientes</SelectItem>
+              {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <div className="flex gap-4 h-[calc(100vh-280px)] min-h-96">

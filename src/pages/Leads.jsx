@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { UserPlus, Search, Pencil, Download, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,32 +18,41 @@ import { es } from 'date-fns/locale';
 const STATUS_OPTIONS = ['new', 'contacted', 'quoted', 'won', 'lost'];
 
 export default function Leads() {
+  const { isAdmin, clientProfile } = useAuth();
   const [leads, setLeads] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [filterClient, setFilterClient] = useState('all');
+  const [filterClient, setFilterClient] = useState(isAdmin ? 'all' : clientProfile?.id || 'all');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  const clientId = isAdmin ? null : clientProfile?.id;
+
   const load = () => {
     setLoading(true);
-    Promise.all([
-      base44.entities.Lead.list('-created_date', 300),
-      base44.entities.Client.list('-created_date', 200),
-    ]).then(([l, c]) => { setLeads(l); setClients(c); }).finally(() => setLoading(false));
+    const promises = [base44.entities.Lead.list('-created_date', 300)];
+
+    if (isAdmin) {
+      promises.push(base44.entities.Client.list('-created_date', 200));
+    }
+
+    Promise.all(promises).then(([l, c]) => {
+      setLeads(l);
+      if (c) setClients(c);
+    }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [isAdmin, clientProfile?.id]);
 
   const clientName = (id) => clients.find(c => c.id === id)?.business_name || '—';
 
   const filtered = leads.filter(l => {
     const matchSearch = !search || l.customer_name?.toLowerCase().includes(search.toLowerCase()) || l.phone?.includes(search);
     const matchStatus = filterStatus === 'all' || l.status === filterStatus;
-    const matchClient = filterClient === 'all' || l.client_id === filterClient;
+    const matchClient = clientId ? l.client_id === clientId : (filterClient === 'all' || l.client_id === filterClient);
     return matchSearch && matchStatus && matchClient;
   });
 
@@ -98,13 +108,15 @@ export default function Leads() {
             {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={filterClient} onValueChange={setFilterClient}>
-          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los clientes</SelectItem>
-            {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {isAdmin && (
+          <Select value={filterClient} onValueChange={setFilterClient}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los clientes</SelectItem>
+              {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Summary pills */}

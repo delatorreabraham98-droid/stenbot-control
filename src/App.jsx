@@ -14,11 +14,18 @@ import Conversations from '@/pages/Conversations';
 import Leads from '@/pages/Leads';
 import Knowledge from '@/pages/Knowledge';
 import SettingsPage from '@/pages/Settings';
+import Register from '@/pages/Register';
+import ClientDashboard from '@/pages/client/Dashboard';
+import ClientSettings from '@/pages/client/Settings';
+import ClientIntegrations from '@/pages/client/Integrations';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const {
+    isLoadingAuth, isLoadingPublicSettings, authError,
+    navigateToLogin, needsRegistration, isAdmin, loadingClient
+  } = useAuth();
 
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  if (isLoadingPublicSettings || isLoadingAuth || loadingClient) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -40,17 +47,42 @@ const AuthenticatedApp = () => {
     }
   }
 
+  if (needsRegistration) {
+    return (
+      <Routes>
+        <Route path="/register" element={<Register />} />
+        <Route path="*" element={<Register />} />
+      </Routes>
+    );
+  }
+
+  if (isAdmin) {
+    return (
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/clients" element={<Clients />} />
+          <Route path="/bots" element={<Bots />} />
+          <Route path="/channels" element={<Channels />} />
+          <Route path="/conversations" element={<Conversations />} />
+          <Route path="/leads" element={<Leads />} />
+          <Route path="/knowledge" element={<Knowledge />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/clients" element={<Clients />} />
-        <Route path="/bots" element={<Bots />} />
-        <Route path="/channels" element={<Channels />} />
+        <Route path="/" element={<ClientDashboard />} />
         <Route path="/conversations" element={<Conversations />} />
         <Route path="/leads" element={<Leads />} />
         <Route path="/knowledge" element={<Knowledge />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/integrations" element={<ClientIntegrations />} />
+        <Route path="/settings" element={<ClientSettings />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

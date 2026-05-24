@@ -12,7 +12,9 @@ export const AuthProvider = ({ children }) => {
   const [isLoadingPublicSettings, setIsLoadingPublicSettings] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [appPublicSettings, setAppPublicSettings] = useState(null); // Contains only { id, public_settings }
+  const [appPublicSettings, setAppPublicSettings] = useState(null);
+  const [clientProfile, setClientProfile] = useState(null);
+  const [loadingClient, setLoadingClient] = useState(false);
 
   useEffect(() => {
     checkAppState();
@@ -89,22 +91,35 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loadClientProfile = async (userEmail) => {
+    if (!userEmail) return;
+    setLoadingClient(true);
+    try {
+      const clients = await base44.entities.Client.filter({ email: userEmail });
+      setClientProfile(clients[0] || null);
+    } catch (err) {
+      console.error('Failed to load client profile:', err);
+      setClientProfile(null);
+    } finally {
+      setLoadingClient(false);
+    }
+  };
+
   const checkUserAuth = async () => {
     try {
-      // Now check if the user is authenticated
       setIsLoadingAuth(true);
       const currentUser = await base44.auth.me();
       setUser(currentUser);
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
       setAuthChecked(true);
+      await loadClientProfile(currentUser.email);
     } catch (error) {
       console.error('User auth check failed:', error);
       setIsLoadingAuth(false);
       setIsAuthenticated(false);
       setAuthChecked(true);
       
-      // If user auth fails, it might be an expired token
       if (error.status === 401 || error.status === 403) {
         setAuthError({
           type: 'auth_required',
@@ -132,6 +147,11 @@ export const AuthProvider = ({ children }) => {
     base44.auth.redirectToLogin(window.location.href);
   };
 
+  const refreshClientProfile = () => loadClientProfile(user?.email);
+
+  const isAdmin = user?.role === 'admin';
+  const needsRegistration = !isAdmin && isAuthenticated && authChecked && !loadingClient && !clientProfile && !authError;
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -141,10 +161,15 @@ export const AuthProvider = ({ children }) => {
       authError,
       appPublicSettings,
       authChecked,
+      clientProfile,
+      loadingClient,
+      isAdmin,
+      needsRegistration,
       logout,
       navigateToLogin,
       checkUserAuth,
-      checkAppState
+      checkAppState,
+      refreshClientProfile
     }}>
       {children}
     </AuthContext.Provider>

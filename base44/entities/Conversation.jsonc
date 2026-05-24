@@ -5,6 +5,10 @@
     "client_id": {
       "type": "string"
     },
+    "client_email": {
+      "type": "string",
+      "format": "email"
+    },
     "channel_id": {
       "type": "string"
     },
@@ -67,6 +71,9 @@
           "created_by": "{{user.email}}"
         },
         {
+          "data.client_email": "{{user.email}}"
+        },
+        {
           "user_condition": {
             "role": "admin"
           }
@@ -77,6 +84,9 @@
       "$or": [
         {
           "created_by": "{{user.email}}"
+        },
+        {
+          "data.client_email": "{{user.email}}"
         },
         {
           "user_condition": {

@@ -12,12 +12,12 @@ import EmptyState from '@/components/ui/EmptyState';
 import { toast } from 'sonner';
 
 const emptyForm = {
-  client_id: '', bot_id: '', type: 'whatsapp',
+  client_id: '', client_email: '', bot_id: '', type: 'whatsapp',
   meta_business_id: '', phone_number_id: '', page_id: '',
   instagram_business_account_id: '', webhook_verify_token: '', status: 'inactive'
 };
 
-const WEBHOOK_BASE = 'https://your-backend.onrender.com/webhook';
+const WEBHOOK_BASE = 'WEBHOOK_URL_PENDIENTE/webhookWhatsApp';
 
 export default function Channels() {
   const [channels, setChannels] = useState([]);
@@ -155,7 +155,10 @@ export default function Channels() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Cliente *</Label>
-                <Select value={form.client_id} onValueChange={v => setForm(f => ({ ...f, client_id: v, bot_id: '' }))}>
+                <Select value={form.client_id} onValueChange={v => {
+                  const c = clients.find(cl => cl.id === v);
+                  setForm(f => ({ ...f, client_id: v, client_email: c?.email || '', bot_id: '' }));
+                }}>
                   <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
                   <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}</SelectContent>
                 </Select>

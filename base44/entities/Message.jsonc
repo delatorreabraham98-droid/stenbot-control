@@ -6,6 +6,10 @@
       "type": "string",
       "description": "ID del cliente due\u00f1o de la conversaci\u00f3n"
     },
+    "client_email": {
+      "type": "string",
+      "format": "email"
+    },
     "conversation_id": {
       "type": "string"
     },
@@ -77,6 +81,9 @@
           "created_by": "{{user.email}}"
         },
         {
+          "data.client_email": "{{user.email}}"
+        },
+        {
           "user_condition": {
             "role": "admin"
           }
@@ -89,6 +96,9 @@
           "created_by": "{{user.email}}"
         },
         {
+          "data.client_email": "{{user.email}}"
+        },
+        {
           "user_condition": {
             "role": "admin"
           }
@@ -99,6 +109,9 @@
       "$or": [
         {
           "created_by": "{{user.email}}"
+        },
+        {
+          "data.client_email": "{{user.email}}"
         },
         {
           "user_condition": {

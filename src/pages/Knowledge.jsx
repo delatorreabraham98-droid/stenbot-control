@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 import { Plus, BookOpen, Pencil, Trash2, Search, ToggleLeft, ToggleRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,40 +20,57 @@ const CATEGORY_LABELS = {
   wholesale: 'Mayoreo', other: 'Otro'
 };
 
-const emptyForm = { client_id: '', title: '', content: '', category: 'faq', active: true };
+const emptyForm = { client_id: '', client_email: '', title: '', content: '', category: 'faq', active: true };
 
 export default function Knowledge() {
+  const { isAdmin, clientProfile } = useAuth();
   const [items, setItems] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
-  const [filterClient, setFilterClient] = useState('all');
+  const [filterClient, setFilterClient] = useState(isAdmin ? 'all' : clientProfile?.id || 'all');
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
 
+  const clientId = isAdmin ? null : clientProfile?.id;
+
   const load = () => {
     setLoading(true);
-    Promise.all([
-      base44.entities.KnowledgeItem.list('-created_date', 300),
-      base44.entities.Client.list('-created_date', 200),
-    ]).then(([it, cl]) => { setItems(it); setClients(cl); }).finally(() => setLoading(false));
+    const promises = [base44.entities.KnowledgeItem.list('-created_date', 300)];
+
+    if (isAdmin) {
+      promises.push(base44.entities.Client.list('-created_date', 200));
+    }
+
+    Promise.all(promises).then(([it, cl]) => {
+      setItems(it);
+      if (cl) setClients(cl);
+    }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [isAdmin, clientProfile?.id]);
 
   const clientName = (id) => clients.find(c => c.id === id)?.business_name || '—';
 
   const filtered = items.filter(it => {
     const matchSearch = !search || it.title?.toLowerCase().includes(search.toLowerCase()) || it.content?.toLowerCase().includes(search.toLowerCase());
     const matchCat = filterCat === 'all' || it.category === filterCat;
-    const matchClient = filterClient === 'all' || it.client_id === filterClient;
+    const matchClient = clientId ? it.client_id === clientId : (filterClient === 'all' || it.client_id === filterClient);
     return matchSearch && matchCat && matchClient;
   });
 
-  const openCreate = () => { setForm(emptyForm); setEditing(null); setOpen(true); };
+  const openCreate = () => {
+    if (clientId) {
+      setForm({ ...emptyForm, client_id: clientId, client_email: clientProfile?.email || '' });
+    } else {
+      setForm(emptyForm);
+    }
+    setEditing(null);
+    setOpen(true);
+  };
   const openEdit = (item) => { setForm({ ...item }); setEditing(item.id); setOpen(true); };
 
   const save = async () => {
@@ -113,13 +131,15 @@ export default function Knowledge() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <Select value={filterClient} onValueChange={setFilterClient}>
-          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los clientes</SelectItem>
-            {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {isAdmin && (
+          <Select value={filterClient} onValueChange={setFilterClient}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los clientes</SelectItem>
+              {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {loading ? (
@@ -159,13 +179,18 @@ export default function Knowledge() {
           <DialogHeader><DialogTitle>{editing ? 'Editar elemento' : 'Nuevo elemento'}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-2">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Cliente *</Label>
-                <Select value={form.client_id} onValueChange={v => setForm(f => ({ ...f, client_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                  <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
+              {isAdmin && (
+                <div className="space-y-1.5">
+                  <Label>Cliente *</Label>
+                  <Select value={form.client_id} onValueChange={v => {
+                    const c = clients.find(cl => cl.id === v);
+                    setForm(f => ({ ...f, client_id: v, client_email: c?.email || '' }));
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                    <SelectContent>{clients.map(c => <SelectItem key={c.id} value={c.id}>{c.business_name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label>Categoría</Label>
                 <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v }))}>

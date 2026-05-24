@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Users, MessageSquare, UserPlus, AlertTriangle, Bot, Radio, TrendingUp, Activity } from 'lucide-react';
+import { Users, MessageSquare, UserPlus, AlertTriangle, Bot, Radio, TrendingUp, Activity, Plug, Building2 } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -13,19 +13,22 @@ export default function Dashboard() {
   const [conversations, setConversations] = useState([]);
   const [leads, setLeads] = useState([]);
   const [bots, setBots] = useState([]);
+  const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
-      base44.entities.Client.list('-created_date', 100),
-      base44.entities.Conversation.list('-last_message_at', 100),
-      base44.entities.Lead.list('-created_date', 100),
-      base44.entities.Bot.list('-created_date', 100),
-    ]).then(([c, conv, l, b]) => {
+      base44.entities.Client.list('-created_date', 200),
+      base44.entities.Conversation.list('-last_message_at', 200),
+      base44.entities.Lead.list('-created_date', 200),
+      base44.entities.Bot.list('-created_date', 200),
+      base44.entities.Channel.list('-created_date', 200),
+    ]).then(([c, conv, l, b, ch]) => {
       setClients(c);
       setConversations(conv);
       setLeads(l);
       setBots(b);
+      setChannels(ch);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -34,6 +37,10 @@ export default function Dashboard() {
   const todayLeads = leads.filter(l => new Date(l.created_date).toDateString() === today);
   const needsHuman = conversations.filter(c => c.status === 'needs_human');
   const activeClients = clients.filter(c => c.status === 'active');
+  const activeBots = bots.filter(b => b.active);
+  const clientsWithChannels = [...new Set(channels.map(ch => ch.client_id).filter(Boolean))].length;
+  const clientsWithBots = [...new Set(bots.map(b => b.client_id).filter(Boolean))].length;
+  const todaysClients = clients.filter(c => new Date(c.created_date).toDateString() === today);
 
   // Last 7 days chart data
   const last7 = Array.from({ length: 7 }, (_, i) => {
@@ -48,6 +55,10 @@ export default function Dashboard() {
   });
 
   const recentConversations = conversations.filter(c => c.status === 'needs_human').slice(0, 5);
+  const recentClients = [...clients].sort((a, b) => new Date(b.created_date).getTime() - new Date(a.created_date).getTime()).slice(0, 5);
+
+  const clientBotCount = (clientId) => bots.filter(b => b.client_id === clientId && b.active).length;
+  const clientChannelCount = (clientId) => channels.filter(ch => ch.client_id === clientId && ch.status === 'active').length;
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -62,6 +73,50 @@ export default function Dashboard() {
         <StatCard title="Conversaciones hoy" value={loading ? '—' : todayConversations.length} icon={MessageSquare} color="blue" loading={loading} />
         <StatCard title="Leads hoy" value={loading ? '—' : todayLeads.length} icon={UserPlus} color="success" loading={loading} />
         <StatCard title="Requieren humano" value={loading ? '—' : needsHuman.length} icon={AlertTriangle} color="warning" loading={loading} />
+      </div>
+
+      {/* Secondary stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="bg-card rounded-2xl border border-border p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/30 flex items-center justify-center">
+            <Bot className="w-5 h-5 text-blue-500" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Bots activos</p>
+            <p className="text-lg font-bold text-foreground">{loading ? '—' : activeBots.length}</p>
+            <p className="text-[10px] text-muted-foreground">{clientsWithBots} clientes con bot</p>
+          </div>
+        </div>
+        <div className="bg-card rounded-2xl border border-border p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-green-50 dark:bg-green-950/30 flex items-center justify-center">
+            <Plug className="w-5 h-5 text-green-500" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Canales activos</p>
+            <p className="text-lg font-bold text-foreground">{loading ? '—' : channels.filter(ch => ch.status === 'active').length}</p>
+            <p className="text-[10px] text-muted-foreground">{clientsWithChannels} clientes con canal</p>
+          </div>
+        </div>
+        <div className="bg-card rounded-2xl border border-border p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950/30 flex items-center justify-center">
+            <Building2 className="w-5 h-5 text-purple-500" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Registros hoy</p>
+            <p className="text-lg font-bold text-foreground">{loading ? '—' : todaysClients.length}</p>
+            <p className="text-[10px] text-muted-foreground">nuevos clientes</p>
+          </div>
+        </div>
+        <div className="bg-card rounded-2xl border border-border p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/30 flex items-center justify-center">
+            <Radio className="w-5 h-5 text-amber-500" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Total canales</p>
+            <p className="text-lg font-bold text-foreground">{loading ? '—' : channels.length}</p>
+            <p className="text-[10px] text-muted-foreground">WhatsApp / IG / Messenger</p>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -82,17 +137,43 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Quick Stats */}
+        {/* Recent Clients */}
         <div className="space-y-4">
+          <div className="bg-card rounded-2xl border border-border p-5">
+            <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-primary" /> Últimos registros
+            </h2>
+            {loading ? (
+              <div className="space-y-2">{Array(5).fill(0).map((_, i) => <div key={i} className="h-8 bg-muted animate-pulse rounded-lg" />)}</div>
+            ) : recentClients.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Sin clientes registrados</p>
+            ) : (
+              <div className="space-y-2">
+                {recentClients.map(c => (
+                  <div key={c.id} className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground truncate">{c.business_name}</p>
+                      <p className="text-[10px] text-muted-foreground">{format(new Date(c.created_date), 'dd MMM HH:mm', { locale: es })}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground flex-shrink-0">
+                      {clientBotCount(c.id) > 0 && <span className="text-green-500">{clientBotCount(c.id)} bot{clientBotCount(c.id) > 1 ? 's' : ''}</span>}
+                      {clientChannelCount(c.id) > 0 && <span className="text-blue-500">· {clientChannelCount(c.id)} canal{clientChannelCount(c.id) > 1 ? 'es' : ''}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="bg-card rounded-2xl border border-border p-5">
             <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2">
               <Activity className="w-4 h-4 text-primary" /> Resumen
             </h2>
             <div className="space-y-3">
               {[
-                { label: 'Bots activos', value: bots.filter(b => b.active).length, total: bots.length },
+                { label: 'Clientes con bot', value: clientsWithBots, total: clients.length },
+                { label: 'Clientes con canal', value: clientsWithChannels, total: clients.length },
                 { label: 'Clientes Pro', value: clients.filter(c => c.plan === 'pro').length, total: clients.length },
-                { label: 'Clientes Enterprise', value: clients.filter(c => c.plan === 'enterprise').length, total: clients.length },
                 { label: 'Leads ganados', value: leads.filter(l => l.status === 'won').length, total: leads.length },
               ].map(item => (
                 <div key={item.label} className="flex items-center justify-between">
@@ -101,13 +182,6 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="bg-card rounded-2xl border border-border p-5">
-            <h2 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-              <Bot className="w-4 h-4 text-primary" /> Canales
-            </h2>
-            <p className="text-sm text-muted-foreground">Ve a <span className="font-medium text-foreground">Canales</span> para gestionar las conexiones de Meta.</p>
           </div>
         </div>
       </div>

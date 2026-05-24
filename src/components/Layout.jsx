@@ -1,12 +1,14 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { base44 } from '@/api/base44Client';
 import {
   LayoutDashboard, Users, Bot, Radio, MessageSquare, UserPlus,
-  BookOpen, Settings, ChevronLeft, ChevronRight, Zap, Menu, X
+  BookOpen, Settings, ChevronLeft, ChevronRight, Zap, Menu, X, Plug
 } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
 
-const navItems = [
+const adminNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/clients', icon: Users, label: 'Clientes' },
   { to: '/bots', icon: Bot, label: 'Bots' },
@@ -17,10 +19,38 @@ const navItems = [
   { to: '/settings', icon: Settings, label: 'Configuración' },
 ];
 
+const clientNavItems = [
+  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/conversations', icon: MessageSquare, label: 'Conversaciones' },
+  { to: '/leads', icon: UserPlus, label: 'Leads' },
+  { to: '/knowledge', icon: BookOpen, label: 'Conocimiento' },
+  { to: '/integrations', icon: Plug, label: 'Integraciones' },
+  { to: '/settings', icon: Settings, label: 'Configuración' },
+];
+
 export default function Layout() {
+  const { isAdmin } = useAuth();
+  const navItems = isAdmin ? adminNavItems : clientNavItems;
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [needsHumanCount, setNeedsHumanCount] = useState(0);
+  const pollingRef = useRef(null);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const fetchCount = async () => {
+      try {
+        const all = await base44.entities.Conversation.list('-last_message_at', 200);
+        setNeedsHumanCount(all.filter(c => c.status === 'needs_human').length);
+      } catch {}
+    };
+
+    fetchCount();
+    pollingRef.current = setInterval(fetchCount, 30_000);
+    return () => clearInterval(pollingRef.current);
+  }, [isAdmin]);
 
   const Sidebar = ({ mobile = false }) => (
     <aside className={cn(
@@ -37,7 +67,7 @@ export default function Layout() {
         {(!collapsed || mobile) && (
           <div>
             <p className="font-syne font-bold text-white text-sm tracking-wide">STEN</p>
-            <p className="text-sidebar-foreground text-xs">Bot Platform</p>
+            <p className="text-sidebar-foreground text-xs">{isAdmin ? 'Admin Panel' : 'Bot Platform'}</p>
           </div>
         )}
       </div>
@@ -45,6 +75,7 @@ export default function Layout() {
       <nav className="flex-1 py-4 overflow-y-auto">
         {navItems.map(({ to, icon: Icon, label }) => {
           const active = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
+          const showBadge = isAdmin && to === '/conversations' && needsHumanCount > 0;
           return (
             <Link
               key={to}
@@ -58,7 +89,14 @@ export default function Layout() {
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
               )}
             >
-              <Icon className={cn("w-4 h-4 flex-shrink-0", active ? "text-primary" : "text-sidebar-foreground group-hover:text-primary")} />
+              <div className="relative">
+                <Icon className={cn("w-4 h-4 flex-shrink-0", active ? "text-primary" : "text-sidebar-foreground group-hover:text-primary")} />
+                {showBadge && (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                    {needsHumanCount > 9 ? '9+' : needsHumanCount}
+                  </span>
+                )}
+              </div>
               {(!collapsed || mobile) && <span className="text-sm font-medium">{label}</span>}
             </Link>
           );
