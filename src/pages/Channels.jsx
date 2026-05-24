@@ -17,7 +17,7 @@ const emptyForm = {
   instagram_business_account_id: '', webhook_verify_token: '', status: 'inactive'
 };
 
-const WEBHOOK_BASE = 'WEBHOOK_URL_PENDIENTE/webhookWhatsApp';
+const WEBHOOK_BASE = 'https://sten-bot-flow.base44.app/webhookWhatsApp';
 
 export default function Channels() {
   const [channels, setChannels] = useState([]);

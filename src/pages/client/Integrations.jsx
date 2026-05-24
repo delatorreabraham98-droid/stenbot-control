@@ -12,7 +12,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-const WEBHOOK_BASE = 'https://your-backend.onrender.com/webhook';
+const WEBHOOK_BASE = 'https://sten-bot-flow.base44.app/webhookWhatsApp';
 
 const INTEGRATIONS = [
   {

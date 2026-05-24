@@ -39,6 +39,7 @@ Deno.serve(async (req) => {
     const savedMessage = await base44.asServiceRole.entities.Message.create({
       conversation_id,
       client_id: conversation.client_id,
+      client_email: conversation.client_email,
       direction: 'outbound',
       sender_type: 'human',
       message_text,
