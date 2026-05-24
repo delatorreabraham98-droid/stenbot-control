@@ -50,19 +50,25 @@ export default function Conversations() {
     setSending(true);
     const text = replyText.trim();
     setReplyText('');
-    const res = await base44.functions.invoke('sendWhatsAppMessage', {
-      conversation_id: selected.id,
-      message_text: text,
-    });
-    if (res.data?.error) throw new Error(res.data.error);
-    if (res.data?.error) {
-      toast.error(`Error al enviar: ${res.data.error}`);
-    } else {
-      toast.success('Mensaje enviado');
+    try {
+      const res = await base44.functions.invoke('sendWhatsAppMessage', {
+        conversation_id: selected.id,
+        message_text: text,
+      });
+      if (res.data?.error) {
+        toast.error(`Error al enviar: ${res.data.error}`);
+        setReplyText(text);
+      } else {
+        toast.success('Mensaje enviado');
+        loadMessages(selected);
+        load();
+      }
+    } catch (err) {
+      toast.error(`Error al enviar: ${err.response?.data?.error || err.message}`);
+      setReplyText(text);
+    } finally {
+      setSending(false);
     }
-    setSending(false);
-    loadMessages(selected);
-    load();
   };
 
   const updateStatus = async (convId, status) => {
