@@ -4,26 +4,62 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
+
     const body = await req.json();
     const payload = body.data || body.args || body.params || body;
+
     const conversation_id = payload.conversation_id || payload.conversationId;
     const message_text = payload.message_text || payload.messageBody || payload.body || payload.text;
+
     if (!conversation_id || !message_text) {
       return Response.json({ error: 'Faltan parámetros' }, { status: 400 });
     }
-    const conversations = await base44.asServiceRole.entities.Conversation.filter({ id: conversation_id });
+
+    const conversations = await base44.asServiceRole.entities.Conversation.filter({
+      id: conversation_id
+    });
+
     const conversation = conversations[0];
-    if (!conversation) return Response.json({ error: 'Conversación no encontrada' }, { status: 404 });
-    const channels = await base44.asServiceRole.entities.Channel.filter({ id: conversation.channel_id });
+
+    if (!conversation) {
+      return Response.json({ error: 'Conversación no encontrada' }, { status: 404 });
+    }
+
+    const channels = await base44.asServiceRole.entities.Channel.filter({
+      id: conversation.channel_id
+    });
+
     const channel = channels[0];
-    if (!channel) return Response.json({ error: 'Canal no encontrado' }, { status: 404 });
+
+    if (!channel) {
+      return Response.json({ error: 'Canal no encontrado' }, { status: 404 });
+    }
+
     const accessToken = Deno.env.get('META_ACCESS_TOKEN');
-    if (!accessToken) return Response.json({ error: 'META_ACCESS_TOKEN no configurado' }, { status: 500 });
+
+    if (!accessToken) {
+      return Response.json({ error: 'META_ACCESS_TOKEN no configurado' }, { status: 500 });
+    }
+
+    const recipientPhone =
+      conversation.customer_phone ||
+      conversation.external_user_id;
+
+    console.log('WHATSAPP SEND DEBUG', {
+      recipientPhone,
+      customer_phone: conversation.customer_phone,
+      external_user_id: conversation.external_user_id,
+      phone_number_id: channel.phone_number_id,
+      conversation_id
+    });
+
     // Enviar WhatsApp con timeout de 10s
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10_000);
+
     try {
       if (channel.type === 'whatsapp') {
+
         const res = await fetch(
           `https://graph.facebook.com/v19.0/${channel.phone_number_id}/messages`,
           {
@@ -34,43 +70,76 @@ Deno.serve(async (req) => {
             },
             body: JSON.stringify({
               messaging_product: 'whatsapp',
-              to: conversation.external_user_id,
+              to: recipientPhone,
               type: 'text',
-              text: { body: message_text },
+              text: {
+                body: message_text
+              },
             }),
             signal: controller.signal
           }
         );
+
         const data = await res.json();
+
+        console.log('META RESPONSE', data);
+
         if (!res.ok) {
           clearTimeout(timer);
-          return Response.json({ error: data.error?.message || 'Error de Meta' }, { status: 400 });
+
+          return Response.json({
+            error: data.error?.message || 'Error de Meta',
+            meta: data
+          }, { status: 400 });
         }
-      } else if (channel.type === 'messenger' || channel.type === 'instagram') {
+
+      } else if (
+        channel.type === 'messenger' ||
+        channel.type === 'instagram'
+      ) {
+
         const res = await fetch(
           `https://graph.facebook.com/v19.0/me/messages?access_token=${accessToken}`,
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
-              recipient: { id: conversation.external_user_id },
-              message: { text: message_text },
+              recipient: {
+                id: conversation.external_user_id
+              },
+              message: {
+                text: message_text
+              },
             }),
             signal: controller.signal
           }
         );
+
         const data = await res.json();
+
+        console.log('META RESPONSE', data);
+
         if (!res.ok) {
           clearTimeout(timer);
-          return Response.json({ error: data.error?.message || 'Error de Meta' }, { status: 400 });
+
+          return Response.json({
+            error: data.error?.message || 'Error de Meta',
+            meta: data
+          }, { status: 400 });
         }
       }
+
     } finally {
       clearTimeout(timer);
     }
-    // Guardar mensaje y actualizar conversación en paralelo
+
+    // Guardar mensaje y actualizar conversación
     const now = new Date().toISOString();
+
     await Promise.all([
+
       base44.asServiceRole.entities.Message.create({
         conversation_id,
         client_id: conversation.client_id,
@@ -80,15 +149,30 @@ Deno.serve(async (req) => {
         message_type: 'text',
         status: 'sent',
       }),
+
       base44.asServiceRole.entities.Conversation.update(conversation_id, {
         last_message_at: now,
         last_message_preview: message_text,
         message_count: (conversation.message_count || 0) + 1,
       })
+
     ]);
-    return Response.json({ success: true });
+
+    return Response.json({
+      success: true
+    });
+
   } catch (error) {
-    const msg = error.name === 'AbortError' ? 'Timeout al enviar WhatsApp' : error.message;
-    return Response.json({ error: msg }, { status: 500 });
+
+    console.error('SEND WHATSAPP ERROR', error);
+
+    const msg =
+      error.name === 'AbortError'
+        ? 'Timeout al enviar WhatsApp'
+        : error.message;
+
+    return Response.json({
+      error: msg
+    }, { status: 500 });
   }
 });
