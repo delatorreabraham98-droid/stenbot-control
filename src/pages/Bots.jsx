@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
+import ContextImporter from '@/components/bots/ContextImporter';
 import { toast } from 'sonner';
 
 const emptyForm = {
@@ -139,6 +140,7 @@ export default function Bots() {
             <div className="space-y-1.5">
               <Label>Contexto del negocio</Label>
               <Textarea placeholder="Ej: Somos una empresa líder en Tijuana especializada en luces LED para hogar y comercio..." value={form.business_context} onChange={e => setForm(f => ({ ...f, business_context: e.target.value }))} rows={3} />
+              <ContextImporter onContextExtracted={(text) => setForm(f => ({ ...f, business_context: (f.business_context ? f.business_context + '\n\n' : '') + text }))} />
             </div>
             <div className="space-y-1.5">
               <Label>Mensaje de escalación a humano</Label>
