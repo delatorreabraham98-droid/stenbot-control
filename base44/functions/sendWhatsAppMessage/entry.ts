@@ -5,8 +5,9 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
     const body = await req.json();
-    const conversation_id = body.conversation_id || body.conversationId;
-    const message_text = body.message_text || body.messageBody || body.body || body.text;
+    const payload = body.data || body.args || body.params || body;
+    const conversation_id = payload.conversation_id || payload.conversationId;
+    const message_text = payload.message_text || payload.messageBody || payload.body || payload.text;
     if (!conversation_id || !message_text) {
       return Response.json({ error: 'Faltan parámetros' }, { status: 400 });
     }
