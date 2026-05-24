@@ -5,10 +5,6 @@
     "client_id": {
       "type": "string"
     },
-    "client_email": {
-      "type": "string",
-      "format": "email"
-    },
     "channel_id": {
       "type": "string"
     },
@@ -61,15 +57,19 @@
   ],
   "rls": {
     "create": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
     },
     "read": {
       "$or": [
-        {
-          "created_by": "{{user.email}}"
-        },
         {
           "data.client_email": "{{user.email}}"
         },
@@ -83,9 +83,6 @@
     "update": {
       "$or": [
         {
-          "created_by": "{{user.email}}"
-        },
-        {
           "data.client_email": "{{user.email}}"
         },
         {
@@ -96,9 +93,16 @@
       ]
     },
     "delete": {
-      "user_condition": {
-        "role": "admin"
-      }
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
     }
   }
 }
