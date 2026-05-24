@@ -22,7 +22,7 @@ import ClientIntegrations from '@/pages/client/Integrations';
 const AuthenticatedApp = () => {
   const {
     isLoadingAuth, isLoadingPublicSettings, authError,
-    navigateToLogin, needsRegistration, isAdmin, loadingClient
+    navigateToLogin, needsRegistration, isAdmin, loadingClient, authChecked
   } = useAuth();
 
   if (isLoadingPublicSettings || isLoadingAuth || loadingClient) {
@@ -36,6 +36,11 @@ const AuthenticatedApp = () => {
         </div>
       </div>
     );
+  }
+
+  if (authChecked && !isAuthenticated && !authError) {
+    navigateToLogin();
+    return null;
   }
 
   if (authError) {
