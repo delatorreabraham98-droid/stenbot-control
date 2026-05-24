@@ -54,6 +54,7 @@ export default function Conversations() {
       conversation_id: selected.id,
       message_text: text,
     });
+    if (res.data?.error) throw new Error(res.data.error);
     if (res.data?.error) {
       toast.error(`Error al enviar: ${res.data.error}`);
     } else {
@@ -127,7 +128,7 @@ export default function Conversations() {
               <EmptyState icon={MessageSquare} title="Sin conversaciones" description="No hay conversaciones que coincidan." />
             ) : (
               filtered.map(conv => (
-                <button
+                <div
                   key={conv.id}
                   onClick={() => loadMessages(conv)}
                   className={cn(
@@ -157,7 +158,7 @@ export default function Conversations() {
                       </button>
                     </div>
                   </div>
-                </button>
+                </div>
               ))
             )}
           </div>
