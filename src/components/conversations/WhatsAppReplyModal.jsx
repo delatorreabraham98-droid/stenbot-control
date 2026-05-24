@@ -24,7 +24,12 @@ export default function WhatsAppReplyModal({ conversation, open, onClose, onSent
         conversation_id: conversation.id,
         message_text: messageBody.trim(),
       });
-      if (res.data?.error) {
+      if (res.data?.success === false && res.data?.saved) {
+        toast.warning(`Guardado en CRM, pero no llegó a WhatsApp: ${res.data.error}`);
+        setMessageBody('');
+        onClose();
+        if (onSent) onSent();
+      } else if (res.data?.error && !res.data?.saved) {
         toast.error('No se pudo enviar el mensaje');
       } else {
         toast.success('Mensaje enviado correctamente');

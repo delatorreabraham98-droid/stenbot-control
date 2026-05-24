@@ -55,7 +55,12 @@ export default function Conversations() {
         conversation_id: selected.id,
         message_text: text,
       });
-      if (res.data?.error) {
+      if (res.data?.success === false && res.data?.saved) {
+        // Guardado en CRM pero falló en Meta
+        toast.warning(`Guardado en CRM pero no llegó a WhatsApp: ${res.data.error}`);
+        loadMessages(selected);
+        load();
+      } else if (res.data?.error && !res.data?.saved) {
         toast.error(`Error al enviar: ${res.data.error}`);
         setReplyText(text);
       } else {
