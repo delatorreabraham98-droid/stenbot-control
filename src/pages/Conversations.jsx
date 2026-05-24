@@ -66,6 +66,18 @@ export default function Conversations() {
     const text = replyText.trim();
     const convId = selected.id;
     setReplyText('');
+
+    // Optimistic update: show message immediately in the chat
+    const tempMsg = {
+      id: `temp-${Date.now()}`,
+      conversation_id: convId,
+      direction: 'outbound',
+      sender_type: 'human',
+      message_text: text,
+      created_date: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, tempMsg]);
+
     try {
       const res = await base44.functions.invoke('sendWhatsAppMessage', {
         conversation_id: convId,
@@ -76,15 +88,15 @@ export default function Conversations() {
       } else if (res.data?.error && !res.data?.saved) {
         toast.error(`Error al enviar: ${res.data.error}`);
         setReplyText(text);
+        // Remove optimistic message on failure
+        setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
         return;
-      } else {
-        toast.success('Mensaje enviado');
       }
-      await reloadMessages(convId);
       load();
     } catch (err) {
       toast.error(`Error al enviar: ${err.response?.data?.error || err.message}`);
       setReplyText(text);
+      setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
     } finally {
       setSending(false);
     }
