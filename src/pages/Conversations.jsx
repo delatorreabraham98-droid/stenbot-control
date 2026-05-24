@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { MessageSquare, Search, AlertTriangle, X, ChevronRight, Send, UserCheck } from 'lucide-react';
+import WhatsAppReplyModal from '@/components/conversations/WhatsAppReplyModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -24,6 +25,7 @@ export default function Conversations() {
   const [filterClient, setFilterClient] = useState('all');
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
+  const [replyModal, setReplyModal] = useState(null); // conversation to reply to
 
   const load = () => {
     setLoading(true);
@@ -145,7 +147,15 @@ export default function Conversations() {
                         <StatusBadge status={conv.status} />
                       </div>
                     </div>
-                    <span className="text-xs text-muted-foreground flex-shrink-0">{timeAgo(conv.last_message_at)}</span>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className="text-xs text-muted-foreground">{timeAgo(conv.last_message_at)}</span>
+                      <button
+                        onClick={e => { e.stopPropagation(); setReplyModal(conv); }}
+                        className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 hover:bg-green-200 font-medium transition-colors whitespace-nowrap"
+                      >
+                        💬 Responder
+                      </button>
+                    </div>
                   </div>
                 </button>
               ))
@@ -227,6 +237,14 @@ export default function Conversations() {
           </div>
         )}
       </div>
+      {replyModal && (
+        <WhatsAppReplyModal
+          conversation={replyModal}
+          open={!!replyModal}
+          onClose={() => setReplyModal(null)}
+          onSent={() => { load(); if (selected?.id === replyModal.id) loadMessages(replyModal); }}
+        />
+      )}
     </div>
   );
 }
