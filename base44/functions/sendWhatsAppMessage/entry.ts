@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     const savedMessage = await base44.asServiceRole.entities.Message.create({
       conversation_id,
       client_id: conversation.client_id,
-      client_email: conversation.client_email || '',
+      client_email: conversation.client_email,
       direction: 'outbound',
       sender_type: 'human',
       message_text,
@@ -46,12 +46,10 @@ Deno.serve(async (req) => {
     });
 
     // 2. Update conversation
-    const newStatus = conversation.status === 'needs_human' ? 'open' : conversation.status;
     await base44.asServiceRole.entities.Conversation.update(conversation_id, {
       last_message_at: now,
       last_message_preview: message_text,
       message_count: (conversation.message_count || 0) + 1,
-      status: newStatus,
     });
 
     // 3. Check if we can send to Meta
