@@ -46,21 +46,17 @@ export default function Conversations() {
   const sendReply = async () => {
     if (!replyText.trim() || !selected) return;
     setSending(true);
-    await base44.entities.Message.create({
-      conversation_id: selected.id,
-      client_id: selected.client_id,
-      direction: 'outbound',
-      sender_type: 'human',
-      message_text: replyText.trim(),
-      message_type: 'text',
-      status: 'sent',
-    });
-    await base44.entities.Conversation.update(selected.id, {
-      last_message_at: new Date().toISOString(),
-      last_message_preview: replyText.trim(),
-      message_count: (selected.message_count || 0) + 1,
-    });
+    const text = replyText.trim();
     setReplyText('');
+    const res = await base44.functions.invoke('sendWhatsAppMessage', {
+      conversation_id: selected.id,
+      message_text: text,
+    });
+    if (res.data?.error) {
+      toast.error(`Error al enviar: ${res.data.error}`);
+    } else {
+      toast.success('Mensaje enviado');
+    }
     setSending(false);
     loadMessages(selected);
     load();
