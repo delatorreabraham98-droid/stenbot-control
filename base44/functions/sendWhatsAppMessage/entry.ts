@@ -21,6 +21,9 @@ Deno.serve(async (req) => {
     if (!conversation) {
       return Response.json({ error: 'Conversación no encontrada' }, { status: 404 });
     }
+    if (!conversation.channel_id) {
+      return Response.json({ error: 'La conversación no tiene un canal asignado' }, { status: 400 });
+    }
 
     const channels = await base44.asServiceRole.entities.Channel.filter({ id: conversation.channel_id });
     const channel = channels[0];
@@ -28,18 +31,13 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Canal no encontrado' }, { status: 404 });
     }
 
-    const accessToken = Deno.env.get('META_ACCESS_TOKEN');
-    if (!accessToken) {
-      return Response.json({ error: 'META_ACCESS_TOKEN no configurado' }, { status: 500 });
-    }
-
     const now = new Date().toISOString();
 
-    // 1. Guardar el mensaje en el CRM primero (siempre)
+    // 1. Save message to CRM (always — even if send fails later)
     const savedMessage = await base44.asServiceRole.entities.Message.create({
       conversation_id,
       client_id: conversation.client_id,
-      client_email: conversation.client_email,
+      client_email: conversation.client_email || '',
       direction: 'outbound',
       sender_type: 'human',
       message_text,
@@ -47,14 +45,25 @@ Deno.serve(async (req) => {
       status: 'sent',
     });
 
-    // Actualizar conversación
+    // 2. Update conversation
+    const newStatus = conversation.status === 'needs_human' ? 'open' : conversation.status;
     await base44.asServiceRole.entities.Conversation.update(conversation_id, {
       last_message_at: now,
       last_message_preview: message_text,
       message_count: (conversation.message_count || 0) + 1,
+      status: newStatus,
     });
 
-    // 2. Intentar enviar por Meta
+    // 3. Check if we can send to Meta
+    const accessToken = Deno.env.get('META_ACCESS_TOKEN');
+    if (!accessToken) {
+      return Response.json({
+        success: false,
+        saved: true,
+        error: 'META_ACCESS_TOKEN no configurado. Mensaje guardado en CRM.',
+      });
+    }
+
     const recipientPhone = conversation.customer_phone || conversation.external_user_id;
 
     console.log('WHATSAPP SEND DEBUG', {
@@ -62,13 +71,14 @@ Deno.serve(async (req) => {
       customer_phone: conversation.customer_phone,
       external_user_id: conversation.external_user_id,
       phone_number_id: channel.phone_number_id,
-      conversation_id
+      channel_type: channel.type,
+      conversation_id,
     });
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10_000);
-
+    // 4. Send via Meta API
     let metaError = null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
 
     try {
       let res;
@@ -88,7 +98,7 @@ Deno.serve(async (req) => {
               type: 'text',
               text: { body: message_text },
             }),
-            signal: controller.signal
+            signal: controller.signal,
           }
         );
       } else if (channel.type === 'messenger' || channel.type === 'instagram') {
@@ -101,9 +111,11 @@ Deno.serve(async (req) => {
               recipient: { id: conversation.external_user_id },
               message: { text: message_text },
             }),
-            signal: controller.signal
+            signal: controller.signal,
           }
         );
+      } else {
+        metaError = `Tipo de canal no soportado: ${channel.type}`;
       }
 
       if (res) {
@@ -113,7 +125,6 @@ Deno.serve(async (req) => {
         if (!res.ok) {
           metaError = data.error?.message || 'Error de Meta';
           console.error('META ERROR', data);
-          // Marcar mensaje como fallido
           await base44.asServiceRole.entities.Message.update(savedMessage.id, { status: 'failed' });
         }
       }
@@ -126,12 +137,11 @@ Deno.serve(async (req) => {
         success: false,
         saved: true,
         error: metaError,
-        message: 'Mensaje guardado en CRM pero no enviado a WhatsApp'
-      }, { status: 400 });
+        message: 'Mensaje guardado en CRM pero no enviado a WhatsApp',
+      });
     }
 
     return Response.json({ success: true, saved: true });
-
   } catch (error) {
     console.error('SEND WHATSAPP ERROR', error);
     const msg = error.name === 'AbortError' ? 'Timeout al enviar WhatsApp' : error.message;
