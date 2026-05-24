@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   LayoutDashboard, Users, Bot, Radio, MessageSquare, UserPlus,
-  BookOpen, Settings, ChevronLeft, ChevronRight, Zap, Menu, X, Plug
+  BookOpen, Settings, ChevronLeft, ChevronRight, Zap, Menu, X, Plug, LogOut
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
@@ -104,7 +104,18 @@ export default function Layout() {
       </nav>
 
       {!mobile && (
-        <div className="p-3 border-t border-sidebar-border">
+        <div className="p-3 border-t border-sidebar-border space-y-1">
+          <button
+            onClick={() => base44.auth.logout()}
+            className={cn(
+              "w-full flex items-center gap-3 p-2 rounded-lg hover:bg-red-500/20 text-sidebar-foreground hover:text-red-400 transition-all",
+              collapsed ? "justify-center" : "px-3"
+            )}
+            title="Cerrar sesión"
+          >
+            <LogOut className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && <span className="text-sm font-medium">Cerrar sesión</span>}
+          </button>
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="w-full flex items-center justify-center p-2 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground hover:text-white transition-all"
