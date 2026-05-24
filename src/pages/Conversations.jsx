@@ -166,6 +166,9 @@ export default function Conversations() {
                         {conv.status === 'needs_human' && <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" />}
                       </div>
                       <p className="text-xs text-muted-foreground truncate">{conv.last_message_preview}</p>
+                      {conv.customer_phone && (
+                        <p className="text-xs text-muted-foreground font-mono">📱 {conv.customer_phone}</p>
+                      )}
                       <div className="flex items-center gap-2 mt-1">
                         <StatusBadge status={conv.channel_type || 'whatsapp'} />
                         <StatusBadge status={conv.status} />
@@ -193,6 +196,9 @@ export default function Conversations() {
             <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
               <div>
                 <p className="font-semibold text-foreground">{selected.customer_name || selected.external_user_id}</p>
+                {selected.customer_phone && (
+                  <p className="text-xs text-muted-foreground font-mono">📱 {selected.customer_phone}</p>
+                )}
                 <div className="flex items-center gap-2 mt-0.5">
                   <StatusBadge status={selected.channel_type || 'whatsapp'} />
                   <StatusBadge status={selected.status} />
