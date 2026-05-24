@@ -55,29 +55,33 @@ export default function Conversations() {
     setLoadingMessages(false);
   };
 
+  const reloadMessages = async (convId) => {
+    const msgs = await base44.entities.Message.filter({ conversation_id: convId }, 'created_date', 100);
+    setMessages(msgs);
+  };
+
   const sendReply = async () => {
     if (!replyText.trim() || !selected) return;
     setSending(true);
     const text = replyText.trim();
+    const convId = selected.id;
     setReplyText('');
     try {
       const res = await base44.functions.invoke('sendWhatsAppMessage', {
-        conversation_id: selected.id,
+        conversation_id: convId,
         message_text: text,
       });
       if (res.data?.success === false && res.data?.saved) {
-        // Guardado en CRM pero falló en Meta
         toast.warning(`Guardado en CRM pero no llegó a WhatsApp: ${res.data.error}`);
-        loadMessages(selected);
-        load();
       } else if (res.data?.error && !res.data?.saved) {
         toast.error(`Error al enviar: ${res.data.error}`);
         setReplyText(text);
+        return;
       } else {
         toast.success('Mensaje enviado');
-        loadMessages(selected);
-        load();
       }
+      await reloadMessages(convId);
+      load();
     } catch (err) {
       toast.error(`Error al enviar: ${err.response?.data?.error || err.message}`);
       setReplyText(text);
