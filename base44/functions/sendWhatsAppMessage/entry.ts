@@ -33,14 +33,6 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
 
-    // Backfill conversation client_email if missing (existing conversations)
-    if (!conversation.client_email && channel.client_email) {
-      await base44.asServiceRole.entities.Conversation.update(conversation_id, {
-        client_email: channel.client_email,
-      });
-      conversation.client_email = channel.client_email;
-    }
-
     // 1. Save message to CRM (always — even if send fails later)
     const savedMessage = await base44.asServiceRole.entities.Message.create({
       conversation_id,
