@@ -5,10 +5,6 @@
     "client_id": {
       "type": "string"
     },
-    "client_email": {
-      "type": "string",
-      "format": "email"
-    },
     "title": {
       "type": "string"
     },
@@ -59,9 +55,6 @@
           "created_by": "{{user.email}}"
         },
         {
-          "data.client_email": "{{user.email}}"
-        },
-        {
           "user_condition": {
             "role": "admin"
           }
@@ -74,9 +67,6 @@
           "created_by": "{{user.email}}"
         },
         {
-          "data.client_email": "{{user.email}}"
-        },
-        {
           "user_condition": {
             "role": "admin"
           }
@@ -84,19 +74,9 @@
       ]
     },
     "delete": {
-      "$or": [
-        {
-          "created_by": "{{user.email}}"
-        },
-        {
-          "data.client_email": "{{user.email}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
+      "user_condition": {
+        "role": "admin"
+      }
     }
   }
 }
