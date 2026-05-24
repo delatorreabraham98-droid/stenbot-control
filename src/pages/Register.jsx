@@ -73,8 +73,7 @@ export default function Register() {
     const existing = await base44.entities.Client.filter({ email: user.email });
     if (existing && existing.length > 0) {
       toast.success('Ya tienes una cuenta creada');
-      await refreshClientProfile();
-      navigate('/');
+      window.location.href = '/';
       return;
     }
 
@@ -126,7 +125,8 @@ export default function Register() {
 
       toast.success('Cuenta creada exitosamente');
       await refreshClientProfile();
-      navigate('/');
+      // Forzar recarga completa para que AuthContext re-evalúe el estado
+      window.location.href = '/';
     } catch (err) {
       console.error('Registration error:', err);
       toast.error(err.message || 'Error al crear la cuenta');
