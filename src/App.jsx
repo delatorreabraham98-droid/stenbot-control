@@ -38,7 +38,7 @@ const AuthenticatedApp = () => {
     );
   }
 
-  if (authChecked && !isAuthenticated && !authError) {
+  if (authChecked && !isAdmin && !needsRegistration && !authError) {
     navigateToLogin();
     return null;
   }
