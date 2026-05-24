@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -40,8 +40,16 @@ const DEFAULT_BOT_PERSONALITY = `Eres un asistente de ventas amable y profesiona
 const DEFAULT_BOT_CONTEXT = `Somos una empresa dedicada a ofrecer productos y servicios de calidad a nuestros clientes.`;
 
 export default function Register() {
-  const { user, refreshClientProfile } = useAuth();
+  const { user, refreshClientProfile, clientProfile } = useAuth();
   const navigate = useNavigate();
+
+  // Si ya tiene perfil de cliente, redirigir inmediatamente
+  useEffect(() => {
+    if (clientProfile) {
+      navigate('/');
+    }
+  }, [clientProfile]);
+
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -56,6 +64,17 @@ export default function Register() {
   const handleSubmit = async () => {
     if (!form.business_name.trim()) {
       toast.error('El nombre del negocio es obligatorio');
+      return;
+    }
+
+    if (saving) return; // Prevenir doble envío
+
+    // Verificar si ya existe un cliente con este email antes de crear
+    const existing = await base44.entities.Client.filter({ email: user.email });
+    if (existing && existing.length > 0) {
+      toast.success('Ya tienes una cuenta creada');
+      await refreshClientProfile();
+      navigate('/');
       return;
     }
 
