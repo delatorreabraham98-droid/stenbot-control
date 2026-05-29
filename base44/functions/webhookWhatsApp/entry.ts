@@ -538,7 +538,7 @@ Deno.serve(async (req) => {
             customerText
           );
 
-          const respondWithAudio = bot?.respond_with_audio === true;
+          const respondWithAudio = messageType === 'audio';
           let sendResult: { ok: boolean; error?: string };
           let audioMediaId: string | undefined;
 
