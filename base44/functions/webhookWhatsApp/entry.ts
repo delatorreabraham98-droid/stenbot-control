@@ -128,58 +128,89 @@ async function transcribeAudio(audioData: Uint8Array, fileName: string, groqApiK
   return '';
 }
 
-function splitTextForGoogleTTS(text: string, maxLen: number = 200): string[] {
-  const sentences = text.match(/[^.!?\n]+[.!?\n]*/g) || [text];
+
+function stripEmojis(text: string): string {
+  return text.replace(/[\ud800-\udfff\u200d\u200b\ufe0f\u23cf\u231a\u23f0-\u23fa\u2600-\u27bf]+/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function shortenForAudio(text: string): string {
+  return text
+    .replace(/\n{2,}/g, '. ')
+    .replace(/\n/g, '. ')
+    .replace(/\b(?:✅|❌|🔹|🔸|👉|💡|🚗|🛒|😊|👌|🔥)\s*/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+async function textToSpeechEdge(text: string, voice: string): Promise<Uint8Array | null> {
+  try {
+    const parts: Uint8Array[] = [];
+    for (const chunk of splitTextForTTS(text)) {
+      const url = `https://api.streamelements.com/kappa/v2/speech?voice=${voice}&text=${encodeURIComponent(chunk)}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      if (!res.ok) return null;
+      const buffer = await res.arrayBuffer();
+      parts.push(new Uint8Array(buffer));
+    }
+    const totalLen = parts.reduce((s, p) => s + p.length, 0);
+    const combined = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const part of parts) { combined.set(part, offset); offset += part.length; }
+    return combined;
+  } catch { return null; }
+}
+
+async function textToSpeechGoogle(text: string, lang: string): Promise<Uint8Array | null> {
+  try {
+    const parts: Uint8Array[] = [];
+    for (const chunk of splitTextForTTS(text)) {
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${lang}&q=${encodeURIComponent(chunk)}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      if (!res.ok) return null;
+      const buffer = await res.arrayBuffer();
+      parts.push(new Uint8Array(buffer));
+    }
+    const totalLen = parts.reduce((s, p) => s + p.length, 0);
+    const combined = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const part of parts) { combined.set(part, offset); offset += part.length; }
+    return combined;
+  } catch { return null; }
+}
+
+function splitTextForTTS(text: string, maxLen = 200): string[] {
+  const cleaned = shortenForAudio(stripEmojis(text));
+  if (!cleaned) return [];
+  const sentences = cleaned.match(/[^.!?\n]+[.!?\n]*/g) || [cleaned];
   const chunks: string[] = [];
   let current = '';
-  for (const sentence of sentences) {
-    if ((current + sentence).length > maxLen && current.length > 0) {
-      chunks.push(current.trim());
-      current = sentence;
-    } else {
-      current += sentence;
-    }
+  for (const s of sentences) {
+    if ((current + s).length > maxLen && current.length > 0) { chunks.push(current.trim()); current = s; }
+    else { current += s; }
   }
   if (current.trim()) chunks.push(current.trim());
-  if (chunks.length === 0) chunks.push(text.slice(0, maxLen));
+  if (chunks.length === 0) chunks.push(cleaned.slice(0, maxLen));
   return chunks;
 }
 
 async function textToSpeech(text: string): Promise<Uint8Array | null> {
-  try {
-    const lang = 'es';
-    const chunks = splitTextForGoogleTTS(text);
-    const audioParts: Uint8Array[] = [];
+  const clean = shortenForAudio(stripEmojis(text));
+  if (!clean) return null;
 
-    for (const chunk of chunks) {
-      const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${lang}&q=${encodeURIComponent(chunk)}`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-      if (!res.ok) {
-        console.error('Google TTS error', await res.text().catch(() => ''));
-        return null;
-      }
-      const buffer = await res.arrayBuffer();
-      audioParts.push(new Uint8Array(buffer));
-    }
+  // Edge TTS (voz grave masculina)
+  for (const voice of ['es-MX-JorgeNeural', 'es-ES-AlvaroNeural']) {
+    const result = await textToSpeechEdge(clean, voice);
+    if (result) { console.log('TTS done with Edge', voice); return result; }
+  }
 
-    const totalLen = audioParts.reduce((sum, p) => sum + p.length, 0);
-    const combined = new Uint8Array(totalLen);
-    let offset = 0;
-    for (const part of audioParts) {
-      combined.set(part, offset);
-      offset += part.length;
-    }
-    return combined;
-  } catch (err) {
-    console.error('textToSpeech error', err);
-    return null;
+  // Google TTS fallback
+  for (const lang of ['es-MX', 'es-ES', 'es']) {
+    const result = await textToSpeechGoogle(clean, lang);
+    if (result) return result;
   }
-}
-    return (await res.text()).trim();
-  } catch (err) {
-    console.error('transcribeAudio error', err);
-    return '';
-  }
+
+  console.error('All TTS services failed');
+  return null;
 }
 
 async function uploadMediaToMeta(audioData: Uint8Array, phoneNumberId: string, accessToken: string): Promise<string | null> {
