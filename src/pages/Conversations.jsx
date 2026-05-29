@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { MessageSquare, Search, AlertTriangle, X, ChevronRight, Send, UserCheck } from 'lucide-react';
+import { MessageSquare, Search, AlertTriangle, X, Send, UserCheck, Mic, Volume2 } from 'lucide-react';
 import WhatsAppReplyModal from '@/components/conversations/WhatsAppReplyModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -249,6 +249,12 @@ export default function Conversations() {
                         ? "bg-primary text-primary-foreground rounded-br-sm"
                         : "bg-muted text-foreground rounded-bl-sm"
                     )}>
+                      {msg.message_type === 'audio' && (
+                        <div className="flex items-center gap-1.5 mb-1 text-xs opacity-70">
+                          {msg.direction === 'inbound' ? <Mic className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                          <span>🎤 Audio</span>
+                        </div>
+                      )}
                       <p>{msg.message_text}</p>
                       <p className={cn("text-xs mt-1", msg.direction === 'outbound' ? "text-primary-foreground/70" : "text-muted-foreground")}>
                         {msg.sender_type} · {format(new Date(msg.created_date), 'HH:mm')}

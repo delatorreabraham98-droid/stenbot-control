@@ -34,10 +34,164 @@ function getContactProfile(payload: any): { name: string; wa_id: string } | null
   }
 }
 
-async function sendWhatsAppMessage(phoneNumberId: string, to: string, text: string, accessToken: string): Promise<{ ok: boolean; error?: string }> {
+async function downloadMediaFromMeta(mediaId: string, accessToken: string): Promise<{ data: Uint8Array; mimeType: string } | null> {
+  try {
+    const infoRes = await fetch(
+      `https://graph.facebook.com/${META_API_VERSION}/${mediaId}`,
+      { headers: { 'Authorization': `Bearer ${accessToken}` } }
+    );
+    if (!infoRes.ok) {
+      const err = await infoRes.json();
+      console.error('Meta media info error', err);
+      return null;
+    }
+    const info = await infoRes.json();
+    const downloadUrl = info.url;
+    if (!downloadUrl) {
+      console.error('No download URL in media info', info);
+      return null;
+    }
+    const dlRes = await fetch(downloadUrl, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!dlRes.ok) {
+      console.error('Meta media download error', dlRes.status);
+      return null;
+    }
+    const buffer = await dlRes.arrayBuffer();
+    return { data: new Uint8Array(buffer), mimeType: info.mime_type || 'audio/ogg' };
+  } catch (err) {
+    console.error('downloadMediaFromMeta error', err);
+    return null;
+  }
+}
+
+async function transcribeAudio(audioData: Uint8Array, fileName: string, openAiKey: string): Promise<string> {
+  try {
+    const blob = new Blob([audioData], { type: 'audio/ogg' });
+    const form = new FormData();
+    form.append('file', blob, fileName);
+    form.append('model', 'whisper-1');
+    form.append('response_format', 'text');
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
+
+    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${openAiKey}` },
+      body: form,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('Whisper error', err);
+      return '';
+    }
+    return (await res.text()).trim();
+  } catch (err) {
+    console.error('transcribeAudio error', err);
+    return '';
+  }
+}
+
+async function textToSpeech(text: string, openAiKey: string): Promise<Uint8Array | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
+
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'tts-1',
+        voice: 'alloy',
+        input: text,
+        response_format: 'opus',
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('TTS error', err);
+      return null;
+    }
+    const buffer = await res.arrayBuffer();
+    return new Uint8Array(buffer);
+  } catch (err) {
+    console.error('textToSpeech error', err);
+    return null;
+  }
+}
+
+async function uploadMediaToMeta(audioData: Uint8Array, phoneNumberId: string, accessToken: string): Promise<string | null> {
+  try {
+    const blob = new Blob([audioData], { type: 'audio/ogg' });
+    const form = new FormData();
+    form.append('messaging_product', 'whatsapp');
+    form.append('file', blob, 'response.ogg');
+    form.append('type', 'audio/ogg');
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
+
+    const res = await fetch(
+      `https://graph.facebook.com/${META_API_VERSION}/${phoneNumberId}/media`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+        body: form,
+        signal: controller.signal,
+      }
+    );
+
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      const err = await res.json();
+      console.error('Meta media upload error', err);
+      return null;
+    }
+    const data = await res.json();
+    return data.id || null;
+  } catch (err) {
+    console.error('uploadMediaToMeta error', err);
+    return null;
+  }
+}
+
+async function sendWhatsAppMessage(phoneNumberId: string, to: string, text: string, accessToken: string, audioMediaId?: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10_000);
+
+    let body: any;
+
+    if (audioMediaId) {
+      body = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'audio',
+        audio: { id: audioMediaId },
+      };
+    } else {
+      body = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'text',
+        text: { body: text },
+      };
+    }
 
     const res = await fetch(
       `https://graph.facebook.com/${META_API_VERSION}/${phoneNumberId}/messages`,
@@ -47,12 +201,7 @@ async function sendWhatsAppMessage(phoneNumberId: string, to: string, text: stri
           'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to,
-          type: 'text',
-          text: { body: text },
-        }),
+        body: JSON.stringify(body),
         signal: controller.signal,
       }
     );
@@ -67,6 +216,13 @@ async function sendWhatsAppMessage(phoneNumberId: string, to: string, text: stri
   } catch (err) {
     return { ok: false, error: err.message };
   }
+}
+
+async function sendAudioMessage(phoneNumberId: string, to: string, audioData: Uint8Array, accessToken: string): Promise<{ ok: boolean; error?: string; mediaId?: string }> {
+  const mediaId = await uploadMediaToMeta(audioData, phoneNumberId, accessToken);
+  if (!mediaId) return { ok: false, error: 'No se pudo subir el audio a Meta' };
+  const sendResult = await sendWhatsAppMessage(phoneNumberId, to, '', accessToken, mediaId);
+  return { ...sendResult, mediaId };
 }
 
 async function generateBotResponse(
@@ -158,12 +314,21 @@ async function loadKnowledge(base44: any, clientId: string): Promise<string> {
   }
 }
 
+function getAudioMessageInfo(msg: any): { mediaId: string | null; mimeType: string } {
+  try {
+    const audio = msg.audio;
+    if (!audio) return { mediaId: null, mimeType: 'audio/ogg' };
+    return { mediaId: audio.id || audio.media_id || null, mimeType: audio.mime_type || 'audio/ogg' };
+  } catch {
+    return { mediaId: null, mimeType: 'audio/ogg' };
+  }
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   const channelId = extractChannelId(req.url);
 
   if (req.method === 'GET') {
-    // Meta webhook verification
     const mode = url.searchParams.get('hub.mode');
     const token = url.searchParams.get('hub.verify_token');
     const challenge = url.searchParams.get('hub.challenge');
@@ -202,8 +367,6 @@ Deno.serve(async (req) => {
       return new Response('Invalid JSON', { status: 400 });
     }
 
-    // Respond 200 immediately to Meta (they expect 200 within 20s)
-    // Processing will continue asynchronously
     const respond = (body: string, status: number = 200) => new Response(body, { status });
 
     const phoneNumberId = getPhoneNumberId(payload);
@@ -226,15 +389,38 @@ Deno.serve(async (req) => {
 
     for (const msg of messages) {
       try {
-        // Skip non-text messages for now
-        if (msg.type !== 'text') continue;
-        const customerText = msg.text?.body?.trim();
-        if (!customerText) continue;
+        let customerText = '';
+        let messageType: 'text' | 'audio' = 'text';
+
+        if (msg.type === 'text') {
+          customerText = msg.text?.body?.trim();
+          if (!customerText) continue;
+        } else if (msg.type === 'audio') {
+          messageType = 'audio';
+          const { mediaId, mimeType } = getAudioMessageInfo(msg);
+          if (!mediaId) {
+            console.error('Audio message without media ID, skipping');
+            continue;
+          }
+          const audioData = await downloadMediaFromMeta(mediaId, accessToken);
+          if (!audioData || !audioData.data) {
+            console.error('Failed to download audio media');
+            continue;
+          }
+          const transcribed = await transcribeAudio(audioData.data, `audio.${mimeType.includes('mp4') ? 'm4a' : 'ogg'}`, openAiKey);
+          if (!transcribed) {
+            console.error('Transcription returned empty');
+            continue;
+          }
+          customerText = transcribed;
+          console.log('Transcribed audio:', customerText);
+        } else {
+          continue;
+        }
 
         const senderPhone = msg.from;
         const contactProfile = getContactProfile(payload);
 
-        // Find channel by phone_number_id
         const channels = await base44.asServiceRole.entities.Channel.filter({ phone_number_id: phoneNumberId });
         const channel = channels[0];
         if (!channel) {
@@ -244,7 +430,6 @@ Deno.serve(async (req) => {
 
         const clientEmail = channel.client_email;
 
-        // Find or create conversation
         const existingConvs = await base44.asServiceRole.entities.Conversation.filter({
           channel_id: channel.id,
           external_user_id: senderPhone,
@@ -270,9 +455,14 @@ Deno.serve(async (req) => {
         }
 
         const now = new Date().toISOString();
-        const commonMsgFields = { client_id: channel.client_id, client_email: clientEmail, conversation_id: conversation.id, message_type: 'text' as const, status: 'sent' as const };
+        const commonMsgFields = {
+          client_id: channel.client_id,
+          client_email: clientEmail,
+          conversation_id: conversation.id,
+          message_type: messageType,
+          status: 'sent' as const,
+        };
 
-        // Save incoming message
         await base44.asServiceRole.entities.Message.create({
           ...commonMsgFields,
           direction: 'inbound',
@@ -281,21 +471,15 @@ Deno.serve(async (req) => {
           raw_payload: JSON.stringify(msg),
         });
 
-        // Determine if bot should respond
         const shouldRespond = conversation.status === 'open' || conversation.status === 'bot_active';
 
         if (shouldRespond && openAiKey) {
-          // Load bot config
           const bots = await base44.asServiceRole.entities.Bot.filter({ id: channel.bot_id });
           const bot = bots[0];
 
-          // Load knowledge base
           const knowledgeItems = await loadKnowledge(base44, channel.client_id);
-
-          // Load conversation history
           const history = await buildConversationHistory(base44, conversation.id);
 
-          // Generate AI response
           const { text: botReply, canHandle } = await generateBotResponse(
             openAiKey,
             bot?.bot_personality || '',
@@ -305,19 +489,32 @@ Deno.serve(async (req) => {
             customerText
           );
 
-          // Send via WhatsApp
-          const sendResult = await sendWhatsAppMessage(phoneNumberId, senderPhone, botReply, accessToken);
+          const respondWithAudio = bot?.respond_with_audio === true;
+          let sendResult: { ok: boolean; error?: string };
+          let audioMediaId: string | undefined;
 
-          // Save outgoing message
+          if (respondWithAudio) {
+            const audioData = await textToSpeech(botReply, openAiKey);
+            if (audioData) {
+              const audioResult = await sendAudioMessage(phoneNumberId, senderPhone, audioData, accessToken);
+              sendResult = { ok: audioResult.ok, error: audioResult.error };
+              audioMediaId = audioResult.mediaId;
+            } else {
+              sendResult = await sendWhatsAppMessage(phoneNumberId, senderPhone, botReply, accessToken);
+            }
+          } else {
+            sendResult = await sendWhatsAppMessage(phoneNumberId, senderPhone, botReply, accessToken);
+          }
+
           await base44.asServiceRole.entities.Message.create({
             ...commonMsgFields,
             direction: 'outbound',
             sender_type: 'bot',
             message_text: botReply,
+            message_type: respondWithAudio && audioMediaId ? 'audio' : 'text',
             status: sendResult.ok ? 'sent' : 'failed',
           });
 
-          // Update conversation
           const newStatus = canHandle ? 'bot_active' : 'needs_human';
           const escalationMsg = !canHandle && bot?.human_escalation_message
             ? bot.human_escalation_message
@@ -331,13 +528,13 @@ Deno.serve(async (req) => {
           };
 
           if (escalationMsg) {
-            // Send escalation message if needed
             await sendWhatsAppMessage(phoneNumberId, senderPhone, escalationMsg, accessToken);
             await base44.asServiceRole.entities.Message.create({
               ...commonMsgFields,
               direction: 'outbound',
               sender_type: 'bot',
               message_text: escalationMsg,
+              message_type: 'text',
               status: 'sent',
             });
             updateData.message_count = (updateData.message_count || 1) + 1;
@@ -345,7 +542,6 @@ Deno.serve(async (req) => {
 
           await base44.asServiceRole.entities.Conversation.update(conversation.id, updateData);
         } else if (shouldRespond && !openAiKey) {
-          // No AI configured — mark as needs_human
           await base44.asServiceRole.entities.Conversation.update(conversation.id, {
             status: 'needs_human',
             last_message_at: now,
@@ -353,7 +549,6 @@ Deno.serve(async (req) => {
             message_count: (conversation.message_count || 1),
           });
         } else {
-          // Conversation is closed or needs_human — just update last_message
           await base44.asServiceRole.entities.Conversation.update(conversation.id, {
             last_message_at: now,
             last_message_preview: customerText,

@@ -39,6 +39,11 @@
     },
     "human_escalation_message": {
       "type": "string"
+    },
+    "respond_with_audio": {
+      "type": "boolean",
+      "default": false,
+      "description": "Convertir respuestas del bot a audio"
     }
   },
   "required": [

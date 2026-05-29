@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 
 const emptyForm = {
   client_id: '', client_email: '', name: '', bot_personality: '', business_context: '',
-  default_language: 'es', timezone: 'America/Tijuana', active: true,
+  default_language: 'es', timezone: 'America/Tijuana', active: true, respond_with_audio: false,
   human_escalation_message: 'Un asesor te atenderá en breve. ¡Gracias por tu paciencia!'
 };
 
@@ -148,6 +148,21 @@ export default function Bots() {
             <div className="space-y-1.5">
               <Label>Mensaje de escalación a humano</Label>
               <Textarea value={form.human_escalation_message} onChange={e => setForm(f => ({ ...f, human_escalation_message: e.target.value }))} rows={2} />
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/30">
+              <div className="flex-1">
+                <p className="text-sm font-medium">Responder con audio</p>
+                <p className="text-xs text-muted-foreground">Convierte las respuestas del bot a voz usando IA</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={form.respond_with_audio}
+                onClick={() => setForm(f => ({ ...f, respond_with_audio: !f.respond_with_audio }))}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.respond_with_audio ? 'bg-primary' : 'bg-input'}`}
+              >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition-transform ${form.respond_with_audio ? 'translate-x-[22px]' : 'translate-x-[2px]'}`} />
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
