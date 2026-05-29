@@ -67,31 +67,114 @@ async function downloadMediaFromMeta(mediaId: string, accessToken: string): Prom
   }
 }
 
-async function transcribeAudio(audioData: Uint8Array, fileName: string, openAiKey: string): Promise<string> {
-  try {
-    const blob = new Blob([audioData], { type: 'audio/ogg' });
-    const form = new FormData();
-    form.append('file', blob, fileName);
-    form.append('model', 'whisper-1');
-    form.append('response_format', 'text');
+async function transcribeAudio(audioData: Uint8Array, fileName: string, groqApiKey: string, openAiKey: string): Promise<string> {
+  // Try Groq (free) first
+  if (groqApiKey) {
+    try {
+      const blob = new Blob([audioData], { type: 'audio/ogg' });
+      const form = new FormData();
+      form.append('file', blob, fileName);
+      form.append('model', 'whisper-large-v3');
+      form.append('response_format', 'text');
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30_000);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30_000);
 
-    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${openAiKey}` },
-      body: form,
-      signal: controller.signal,
-    });
+      const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${groqApiKey}` },
+        body: form,
+        signal: controller.signal,
+      });
 
-    clearTimeout(timer);
+      clearTimeout(timer);
 
-    if (!res.ok) {
-      const err = await res.text();
-      console.error('Whisper error', err);
-      return '';
+      if (res.ok) return (await res.text()).trim();
+      console.warn('Groq Whisper failed', await res.text().catch(() => ''));
+    } catch (err) {
+      console.warn('Groq Whisper error', err);
     }
+  }
+
+  // Fallback to OpenAI
+  if (openAiKey) {
+    try {
+      const blob = new Blob([audioData], { type: 'audio/ogg' });
+      const form = new FormData();
+      form.append('file', blob, fileName);
+      form.append('model', 'whisper-1');
+      form.append('response_format', 'text');
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30_000);
+
+      const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${openAiKey}` },
+        body: form,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timer);
+
+      if (res.ok) return (await res.text()).trim();
+      const err = await res.text();
+      console.error('OpenAI Whisper error', err);
+    } catch (err) {
+      console.error('OpenAI Whisper error', err);
+    }
+  }
+
+  return '';
+}
+
+function splitTextForGoogleTTS(text: string, maxLen: number = 200): string[] {
+  const sentences = text.match(/[^.!?\n]+[.!?\n]*/g) || [text];
+  const chunks: string[] = [];
+  let current = '';
+  for (const sentence of sentences) {
+    if ((current + sentence).length > maxLen && current.length > 0) {
+      chunks.push(current.trim());
+      current = sentence;
+    } else {
+      current += sentence;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  if (chunks.length === 0) chunks.push(text.slice(0, maxLen));
+  return chunks;
+}
+
+async function textToSpeech(text: string): Promise<Uint8Array | null> {
+  try {
+    const lang = 'es';
+    const chunks = splitTextForGoogleTTS(text);
+    const audioParts: Uint8Array[] = [];
+
+    for (const chunk of chunks) {
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${lang}&q=${encodeURIComponent(chunk)}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) {
+        console.error('Google TTS error', await res.text().catch(() => ''));
+        return null;
+      }
+      const buffer = await res.arrayBuffer();
+      audioParts.push(new Uint8Array(buffer));
+    }
+
+    const totalLen = audioParts.reduce((sum, p) => sum + p.length, 0);
+    const combined = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const part of audioParts) {
+      combined.set(part, offset);
+      offset += part.length;
+    }
+    return combined;
+  } catch (err) {
+    console.error('textToSpeech error', err);
+    return null;
+  }
+}
     return (await res.text()).trim();
   } catch (err) {
     console.error('transcribeAudio error', err);
@@ -99,48 +182,13 @@ async function transcribeAudio(audioData: Uint8Array, fileName: string, openAiKe
   }
 }
 
-async function textToSpeech(text: string, openAiKey: string): Promise<Uint8Array | null> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30_000);
-
-    const res = await fetch('https://api.openai.com/v1/audio/speech', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'tts-1',
-        voice: 'alloy',
-        input: text,
-        response_format: 'opus',
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timer);
-
-    if (!res.ok) {
-      const err = await res.text();
-      console.error('TTS error', err);
-      return null;
-    }
-    const buffer = await res.arrayBuffer();
-    return new Uint8Array(buffer);
-  } catch (err) {
-    console.error('textToSpeech error', err);
-    return null;
-  }
-}
-
 async function uploadMediaToMeta(audioData: Uint8Array, phoneNumberId: string, accessToken: string): Promise<string | null> {
   try {
-    const blob = new Blob([audioData], { type: 'audio/ogg' });
+    const blob = new Blob([audioData], { type: 'audio/mpeg' });
     const form = new FormData();
     form.append('messaging_product', 'whatsapp');
-    form.append('file', blob, 'response.ogg');
-    form.append('type', 'audio/ogg');
+    form.append('file', blob, 'response.mp3');
+    form.append('type', 'audio/mpeg');
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 30_000);
@@ -386,6 +434,7 @@ Deno.serve(async (req) => {
     }
 
     const openAiKey = Deno.env.get('OPENAI_API_KEY');
+    const groqApiKey = Deno.env.get('GROQ_API_KEY');
 
     for (const msg of messages) {
       try {
@@ -407,7 +456,7 @@ Deno.serve(async (req) => {
             console.error('Failed to download audio media');
             continue;
           }
-          const transcribed = await transcribeAudio(audioData.data, `audio.${mimeType.includes('mp4') ? 'm4a' : 'ogg'}`, openAiKey);
+          const transcribed = await transcribeAudio(audioData.data, `audio.${mimeType.includes('mp4') ? 'm4a' : 'ogg'}`, groqApiKey, openAiKey);
           if (!transcribed) {
             console.error('Transcription returned empty');
             continue;
@@ -494,7 +543,7 @@ Deno.serve(async (req) => {
           let audioMediaId: string | undefined;
 
           if (respondWithAudio) {
-            const audioData = await textToSpeech(botReply, openAiKey);
+            const audioData = await textToSpeech(botReply);
             if (audioData) {
               const audioResult = await sendAudioMessage(phoneNumberId, senderPhone, audioData, accessToken);
               sendResult = { ok: audioResult.ok, error: audioResult.error };
