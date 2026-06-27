@@ -14,6 +14,7 @@ import Conversations from '@/pages/Conversations';
 import Leads from '@/pages/Leads';
 import LeadsKanban from '@/pages/LeadsKanban';
 import Workflows from '@/pages/Workflows';
+import Calendar from '@/pages/Calendar';
 import Knowledge from '@/pages/Knowledge';
 import SettingsPage from '@/pages/Settings';
 import Register from '@/pages/Register';
@@ -76,6 +77,7 @@ const AuthenticatedApp = () => {
           <Route path="/leads" element={<Leads />} />
           <Route path="/leads-kanban" element={<LeadsKanban />} />
           <Route path="/workflows" element={<Workflows />} />
+          <Route path="/calendar" element={<Calendar />} />
           <Route path="/knowledge" element={<Knowledge />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
