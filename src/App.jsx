@@ -17,6 +17,7 @@ import Workflows from '@/pages/Workflows';
 import Calendar from '@/pages/Calendar';
 import Knowledge from '@/pages/Knowledge';
 import SettingsPage from '@/pages/Settings';
+import Help from '@/pages/Help';
 import Register from '@/pages/Register';
 import ClientDashboard from '@/pages/client/Dashboard';
 import ClientSettings from '@/pages/client/Settings';
@@ -79,6 +80,7 @@ const AuthenticatedApp = () => {
           <Route path="/workflows" element={<Workflows />} />
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/knowledge" element={<Knowledge />} />
+          <Route path="/help" element={<Help />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<PageNotFound />} />

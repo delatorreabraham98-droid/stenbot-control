@@ -3,7 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import {
   LayoutDashboard, Users, Bot, Radio, MessageSquare, UserPlus,
-  BookOpen, Settings, ChevronLeft, ChevronRight, Zap, Menu, X, Plug, LogOut, Calendar as CalendarIcon
+  BookOpen, Settings, ChevronLeft, ChevronRight, Zap, Menu, X, Plug, LogOut, Calendar as CalendarIcon,
+  HelpCircle
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
@@ -18,6 +19,7 @@ const adminNavItems = [
   { to: '/workflows', icon: Zap, label: 'Workflows' },
   { to: '/calendar', icon: CalendarIcon, label: 'Calendario' },
   { to: '/knowledge', icon: BookOpen, label: 'Conocimiento' },
+  { to: '/help', icon: HelpCircle, label: 'Ayuda' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
 ];
 
