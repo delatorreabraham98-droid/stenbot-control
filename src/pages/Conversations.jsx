@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { MessageSquare, Search, AlertTriangle, X, Send, UserCheck, Mic, Volume2 } from 'lucide-react';
+import { MessageSquare, Search, AlertTriangle, X, Send, UserCheck, Mic, Volume2, RefreshCw } from 'lucide-react';
 import WhatsAppReplyModal from '@/components/conversations/WhatsAppReplyModal';
+import QuickReplies from '@/components/conversations/QuickReplies';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,9 +11,17 @@ import PageHeader from '@/components/ui/PageHeader';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+
+// Marks a conversation as "urgent" if last message was inbound and >30min ago with no human response
+function isUrgent(conv) {
+  if (conv.status === 'closed') return false;
+  if (!conv.last_message_at) return false;
+  const diff = Date.now() - new Date(conv.last_message_at).getTime();
+  return diff > 30 * 60 * 1000;
+}
 
 export default function Conversations() {
   const { isAdmin, clientProfile } = useAuth();
@@ -29,37 +38,86 @@ export default function Conversations() {
   const [sending, setSending] = useState(false);
   const [replyModal, setReplyModal] = useState(null);
 
+  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+  const selectedRef = useRef(null);
+  selectedRef.current = selected;
+
   const clientId = isAdmin ? null : clientProfile?.id;
 
-  const load = () => {
+  // ── Data loading ──────────────────────────────────────────────
+  const load = useCallback(() => {
     setLoading(true);
     const promises = [base44.entities.Conversation.list('-last_message_at', 200)];
-
-    if (isAdmin) {
-      promises.push(base44.entities.Client.list('-created_date', 200));
-    }
-
+    if (isAdmin) promises.push(base44.entities.Client.list('-created_date', 200));
     Promise.all(promises).then(([conv, cl]) => {
       setConversations(conv);
       if (cl) setClients(cl);
     }).finally(() => setLoading(false));
-  };
+  }, [isAdmin]);
 
-  useEffect(() => { load(); }, [isAdmin, clientProfile?.id]);
+  useEffect(() => { load(); }, [load, clientProfile?.id]);
 
+  // ── Real-time: subscribe to Conversation changes ──────────────
+  useEffect(() => {
+    const unsub = base44.entities.Conversation.subscribe((event) => {
+      if (event.type === 'create') {
+        setConversations(prev => [event.data, ...prev]);
+      } else if (event.type === 'update') {
+        setConversations(prev => prev.map(c => c.id === event.data.id ? { ...c, ...event.data } : c));
+        // If it's the open conversation, update selected too
+        if (selectedRef.current?.id === event.data.id) {
+          setSelected(prev => ({ ...prev, ...event.data }));
+        }
+      }
+    });
+    return unsub;
+  }, []);
+
+  // ── Real-time: subscribe to new Messages ──────────────────────
+  useEffect(() => {
+    const unsub = base44.entities.Message.subscribe((event) => {
+      if (event.type === 'create' && selectedRef.current?.id === event.data.conversation_id) {
+        // Only add if not already in list (avoid duplicate with optimistic update)
+        setMessages(prev => {
+          const exists = prev.some(m => m.id === event.data.id);
+          if (exists) return prev;
+          // Replace temp optimistic message if text matches
+          const tempIdx = prev.findIndex(m => m.id.startsWith('temp-') && m.message_text === event.data.message_text);
+          if (tempIdx !== -1) {
+            const next = [...prev];
+            next[tempIdx] = event.data;
+            return next;
+          }
+          return [...prev, event.data];
+        });
+      }
+    });
+    return unsub;
+  }, []);
+
+  // ── Auto-scroll to bottom ─────────────────────────────────────
+  const scrollToBottom = useCallback((behavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom('smooth');
+  }, [messages, scrollToBottom]);
+
+  // ── Load messages for selected conversation ───────────────────
   const loadMessages = async (conv) => {
     setSelected(conv);
     setLoadingMessages(true);
+    setMessages([]);
     const msgs = await base44.entities.Message.filter({ conversation_id: conv.id }, 'created_date', 100);
     setMessages(msgs);
     setLoadingMessages(false);
+    // Instant scroll on first load
+    setTimeout(() => scrollToBottom('instant'), 50);
   };
 
-  const reloadMessages = async (convId) => {
-    const msgs = await base44.entities.Message.filter({ conversation_id: convId }, 'created_date', 100);
-    setMessages(msgs);
-  };
-
+  // ── Send reply ────────────────────────────────────────────────
   const sendReply = async () => {
     if (!replyText.trim() || !selected) return;
     setSending(true);
@@ -67,7 +125,6 @@ export default function Conversations() {
     const convId = selected.id;
     setReplyText('');
 
-    // Optimistic update: show message immediately in the chat
     const tempMsg = {
       id: `temp-${Date.now()}`,
       conversation_id: convId,
@@ -88,7 +145,6 @@ export default function Conversations() {
       } else if (res.data?.error && !res.data?.saved) {
         toast.error(`Error al enviar: ${res.data.error}`);
         setReplyText(text);
-        // Remove optimistic message on failure
         setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
         return;
       }
@@ -118,13 +174,23 @@ export default function Conversations() {
     return matchSearch && matchStatus && matchClient;
   });
 
-  const timeAgo = (dateStr) => {
+  const timeLabel = (dateStr) => {
     if (!dateStr) return '';
-    return format(new Date(dateStr), 'dd MMM HH:mm', { locale: es });
+    try {
+      return formatDistanceToNow(new Date(dateStr), { addSuffix: true, locale: es });
+    } catch { return ''; }
   };
 
+  // Group messages by day
+  const groupedMessages = messages.reduce((groups, msg) => {
+    const day = format(new Date(msg.created_date), 'yyyy-MM-dd');
+    if (!groups[day]) groups[day] = [];
+    groups[day].push(msg);
+    return groups;
+  }, {});
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
       <PageHeader title="Conversaciones" subtitle="Inbox de mensajes de todos los canales conectados" />
 
       {/* Filters */}
@@ -152,13 +218,22 @@ export default function Conversations() {
             </SelectContent>
           </Select>
         )}
+        <Button variant="outline" size="icon" onClick={load} title="Actualizar">
+          <RefreshCw className="w-4 h-4" />
+        </Button>
       </div>
 
       <div className="flex gap-4 h-[calc(100vh-280px)] min-h-96">
-        {/* Conversation List */}
+
+        {/* ── Conversation List ── */}
         <div className="w-full md:w-80 lg:w-96 flex-shrink-0 bg-card rounded-2xl border border-border overflow-hidden flex flex-col">
-          <div className="p-3 border-b border-border">
+          <div className="p-3 border-b border-border flex items-center justify-between">
             <p className="text-sm font-medium text-muted-foreground">{filtered.length} conversaciones</p>
+            {filtered.filter(isUrgent).length > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">
+                🔴 {filtered.filter(isUrgent).length} urgente{filtered.filter(isUrgent).length > 1 ? 's' : ''}
+              </span>
+            )}
           </div>
           <div className="overflow-y-auto flex-1">
             {loading ? (
@@ -166,49 +241,56 @@ export default function Conversations() {
             ) : filtered.length === 0 ? (
               <EmptyState icon={MessageSquare} title="Sin conversaciones" description="No hay conversaciones que coincidan." />
             ) : (
-              filtered.map(conv => (
-                <div
-                  key={conv.id}
-                  onClick={() => loadMessages(conv)}
-                  className={cn(
-                    "w-full text-left px-4 py-3 border-b border-border hover:bg-muted/40 transition-colors",
-                    selected?.id === conv.id && "bg-primary/5 border-l-2 border-l-primary"
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <p className="text-sm font-semibold text-foreground truncate">{conv.customer_name || conv.external_user_id}</p>
-                        {conv.status === 'needs_human' && <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" />}
+              filtered.map(conv => {
+                const urgent = isUrgent(conv);
+                return (
+                  <div
+                    key={conv.id}
+                    onClick={() => loadMessages(conv)}
+                    className={cn(
+                      "w-full text-left px-4 py-3 border-b border-border hover:bg-muted/40 transition-colors cursor-pointer",
+                      selected?.id === conv.id && "bg-primary/5 border-l-2 border-l-primary",
+                      urgent && selected?.id !== conv.id && "border-l-2 border-l-red-400 bg-red-50/40"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <p className="text-sm font-semibold text-foreground truncate">{conv.customer_name || conv.external_user_id}</p>
+                          {conv.status === 'needs_human' && <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" />}
+                          {urgent && conv.status !== 'needs_human' && <span className="text-xs text-red-500 font-bold flex-shrink-0">!</span>}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{conv.last_message_preview}</p>
+                        {conv.customer_phone && (
+                          <p className="text-xs text-muted-foreground font-mono">📱 {conv.customer_phone}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          <StatusBadge status={conv.channel_type || 'whatsapp'} />
+                          <StatusBadge status={conv.status} />
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">{conv.last_message_preview}</p>
-                      {conv.customer_phone && (
-                        <p className="text-xs text-muted-foreground font-mono">📱 {conv.customer_phone}</p>
-                      )}
-                      <div className="flex items-center gap-2 mt-1">
-                        <StatusBadge status={conv.channel_type || 'whatsapp'} />
-                        <StatusBadge status={conv.status} />
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{timeLabel(conv.last_message_at)}</span>
+                        <button
+                          onClick={e => { e.stopPropagation(); setReplyModal(conv); }}
+                          className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 hover:bg-green-200 font-medium transition-colors whitespace-nowrap"
+                        >
+                          💬 Responder
+                        </button>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <span className="text-xs text-muted-foreground">{timeAgo(conv.last_message_at)}</span>
-                      <button
-                        onClick={e => { e.stopPropagation(); setReplyModal(conv); }}
-                        className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 hover:bg-green-200 font-medium transition-colors whitespace-nowrap"
-                      >
-                        💬 Responder
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
 
-        {/* Message Panel */}
+        {/* ── Message Panel ── */}
         {selected ? (
           <div className="flex-1 bg-card rounded-2xl border border-border overflow-hidden flex flex-col min-w-0">
+
+            {/* Header */}
             <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
               <div>
                 <p className="font-semibold text-foreground">{selected.customer_name || selected.external_user_id}</p>
@@ -218,13 +300,18 @@ export default function Conversations() {
                 <div className="flex items-center gap-2 mt-0.5">
                   <StatusBadge status={selected.channel_type || 'whatsapp'} />
                   <StatusBadge status={selected.status} />
-                  <span className="text-xs text-muted-foreground">{clientName(selected.client_id)}</span>
+                  {isAdmin && <span className="text-xs text-muted-foreground">{clientName(selected.client_id)}</span>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {selected.status !== 'bot_active' && (
+                  <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" onClick={() => updateStatus(selected.id, 'bot_active')}>
+                    Reactivar bot
+                  </Button>
+                )}
                 {selected.status !== 'needs_human' && (
                   <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" onClick={() => updateStatus(selected.id, 'needs_human')}>
-                    <UserCheck className="w-3.5 h-3.5" />Escalar a humano
+                    <UserCheck className="w-3.5 h-3.5" />Escalar
                   </Button>
                 )}
                 {selected.status !== 'closed' && (
@@ -235,42 +322,77 @@ export default function Conversations() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3" id="messages-container">
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-1" ref={messagesContainerRef}>
               {loadingMessages ? (
                 <div className="space-y-3">{Array(5).fill(0).map((_, i) => <div key={i} className={cn("h-12 bg-muted animate-pulse rounded-2xl w-3/4", i % 2 === 0 ? "ml-auto" : "")} />)}</div>
               ) : messages.length === 0 ? (
                 <EmptyState icon={MessageSquare} title="Sin mensajes" description="No hay mensajes en esta conversación." />
               ) : (
-                messages.map(msg => (
-                  <div key={msg.id} className={cn("flex", msg.direction === 'outbound' ? "justify-end" : "justify-start")}>
-                    <div className={cn(
-                      "max-w-[80%] px-4 py-2.5 rounded-2xl text-sm",
-                      msg.direction === 'outbound'
-                        ? "bg-primary text-primary-foreground rounded-br-sm"
-                        : "bg-muted text-foreground rounded-bl-sm"
-                    )}>
-                      {msg.message_type === 'audio' && (
-                        <div className="flex items-center gap-1.5 mb-1 text-xs opacity-70">
-                          {msg.direction === 'inbound' ? <Mic className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
-                          <span>🎤 Audio</span>
-                        </div>
-                      )}
-                      <p>{msg.message_text}</p>
-                      <p className={cn("text-xs mt-1", msg.direction === 'outbound' ? "text-primary-foreground/70" : "text-muted-foreground")}>
-                        {msg.sender_type} · {format(new Date(msg.created_date), 'HH:mm')}
-                      </p>
+                Object.entries(groupedMessages).map(([day, dayMsgs]) => (
+                  <div key={day}>
+                    {/* Day separator */}
+                    <div className="flex items-center gap-2 my-4">
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-xs text-muted-foreground px-2 font-medium">
+                        {format(new Date(day), "d 'de' MMMM", { locale: es })}
+                      </span>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
+                    <div className="space-y-1.5">
+                      {dayMsgs.map((msg, idx) => {
+                        const isOut = msg.direction === 'outbound';
+                        const isTemp = msg.id.startsWith('temp-');
+                        const prevMsg = dayMsgs[idx - 1];
+                        const sameSender = prevMsg && prevMsg.direction === msg.direction;
+
+                        return (
+                          <div key={msg.id} className={cn("flex", isOut ? "justify-end" : "justify-start", sameSender ? "mt-0.5" : "mt-2")}>
+                            <div className={cn(
+                              "max-w-[75%] px-3.5 py-2 rounded-2xl text-sm",
+                              isOut
+                                ? "bg-primary text-primary-foreground rounded-br-sm"
+                                : "bg-muted text-foreground rounded-bl-sm",
+                              isTemp && "opacity-60"
+                            )}>
+                              {msg.message_type === 'audio' && (
+                                <div className="flex items-center gap-1.5 mb-1 text-xs opacity-70">
+                                  {isOut ? <Volume2 className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                                  <span>Mensaje de audio</span>
+                                </div>
+                              )}
+                              <p className="leading-snug whitespace-pre-wrap">{msg.message_text}</p>
+                              <div className={cn("flex items-center gap-1.5 mt-1", isOut ? "justify-end" : "justify-start")}>
+                                <span className={cn("text-xs", isOut ? "text-primary-foreground/60" : "text-muted-foreground")}>
+                                  {msg.sender_type === 'bot' ? '🤖' : msg.sender_type === 'human' ? '👤' : ''}
+                                  {' '}{format(new Date(msg.created_date), 'HH:mm')}
+                                </span>
+                                {isTemp && <span className="text-xs opacity-50">Enviando...</span>}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))
               )}
+              <div ref={messagesEndRef} />
             </div>
+
+            {/* Quick Replies */}
+            <QuickReplies
+              clientId={selected.client_id}
+              clientEmail={selected.client_email}
+              onSelect={(text) => setReplyText(prev => prev ? prev + ' ' + text : text)}
+            />
 
             {/* Reply Box */}
             <div className="px-4 py-3 border-t border-border flex gap-2 items-end">
               <textarea
                 className="flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring min-h-[40px] max-h-28"
                 rows={1}
-                placeholder="Escribe una respuesta..."
+                placeholder="Escribe una respuesta... (Enter para enviar, Shift+Enter para nueva línea)"
                 value={replyText}
                 onChange={e => setReplyText(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendReply(); } }}
@@ -284,11 +406,12 @@ export default function Conversations() {
           <div className="flex-1 bg-card rounded-2xl border border-border flex items-center justify-center">
             <div className="text-center">
               <MessageSquare className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground text-sm">Selecciona una conversación</p>
+              <p className="text-muted-foreground text-sm">Selecciona una conversación para ver los mensajes</p>
             </div>
           </div>
         )}
       </div>
+
       {replyModal && (
         <WhatsAppReplyModal
           conversation={replyModal}
