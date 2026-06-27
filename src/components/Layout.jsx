@@ -14,7 +14,7 @@ const adminNavItems = [
   { to: '/bots', icon: Bot, label: 'Bots' },
   { to: '/channels', icon: Radio, label: 'Canales' },
   { to: '/conversations', icon: MessageSquare, label: 'Conversaciones' },
-  { to: '/leads', icon: UserPlus, label: 'Leads' },
+  { to: '/leads-kanban', icon: UserPlus, label: 'Leads' },
   { to: '/knowledge', icon: BookOpen, label: 'Conocimiento' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
 ];
@@ -22,7 +22,7 @@ const adminNavItems = [
 const clientNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/conversations', icon: MessageSquare, label: 'Conversaciones' },
-  { to: '/leads', icon: UserPlus, label: 'Leads' },
+  { to: '/leads-kanban', icon: UserPlus, label: 'Leads' },
   { to: '/knowledge', icon: BookOpen, label: 'Conocimiento' },
   { to: '/integrations', icon: Plug, label: 'Integraciones' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
