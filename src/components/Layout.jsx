@@ -15,6 +15,7 @@ const adminNavItems = [
   { to: '/channels', icon: Radio, label: 'Canales' },
   { to: '/conversations', icon: MessageSquare, label: 'Conversaciones' },
   { to: '/leads-kanban', icon: UserPlus, label: 'Leads' },
+  { to: '/workflows', icon: Zap, label: 'Workflows' },
   { to: '/knowledge', icon: BookOpen, label: 'Conocimiento' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
 ];

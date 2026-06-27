@@ -1,0 +1,108 @@
+{
+  "name": "Workflow",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "trigger_type": {
+      "type": "string",
+      "enum": [
+        "lead_status_change",
+        "conversation_status_change",
+        "message_received",
+        "lead_created"
+      ]
+    },
+    "trigger_value": {
+      "type": "string",
+      "description": "El valor que activa el trigger (ej: status 'quoted')"
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "send_email",
+              "send_whatsapp",
+              "update_lead",
+              "create_task"
+            ]
+          },
+          "config": {
+            "type": "object",
+            "description": "Configuraci\u00f3n espec\u00edfica de la acci\u00f3n"
+          }
+        }
+      }
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "client_id",
+    "name",
+    "trigger_type"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
