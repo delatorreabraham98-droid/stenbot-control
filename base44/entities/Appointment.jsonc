@@ -69,6 +69,10 @@
     "reminder_sent": {
       "type": "boolean",
       "default": false
+    },
+    "google_calendar_event_id": {
+      "type": "string",
+      "description": "ID del evento en Google Calendar"
     }
   },
   "required": [

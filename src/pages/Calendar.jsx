@@ -18,8 +18,10 @@ import { es } from 'date-fns/locale';
 export default function Calendar() {
   const { isAdmin, clientProfile, user } = useAuth();
   const [appointments, setAppointments] = useState([]);
+  const [googleEvents, setGoogleEvents] = useState([]);
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [syncingGoogleCal, setSyncingGoogleCal] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [editModal, setEditModal] = useState(false);
   const [form, setForm] = useState({
@@ -41,6 +43,19 @@ export default function Calendar() {
 
   const clientId = isAdmin ? null : clientProfile?.id;
 
+  const loadGoogleCalendarEvents = async () => {
+    if (!isAdmin) return;
+    setSyncingGoogleCal(true);
+    try {
+      const res = await base44.functions.invoke('getGoogleCalendarEvents', {});
+      setGoogleEvents(res.data?.events || []);
+    } catch (err) {
+      console.error('Error loading Google Calendar:', err);
+    } finally {
+      setSyncingGoogleCal(false);
+    }
+  };
+
   const load = useCallback(() => {
     setLoading(true);
     const promises = [
@@ -53,7 +68,10 @@ export default function Calendar() {
     }).finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { load(); }, [load, clientProfile?.id]);
+  useEffect(() => { 
+    load();
+    loadGoogleCalendarEvents();
+  }, [load, clientProfile?.id, isAdmin]);
 
   useEffect(() => {
     const unsub = base44.entities.Appointment.subscribe((event) => {
@@ -109,15 +127,32 @@ export default function Calendar() {
         ...form,
         client_id: clientProfile?.id
       };
+      let appointmentId;
       if (editing) {
         await base44.entities.Appointment.update(editing, data);
+        appointmentId = editing;
         toast.success('Cita actualizada');
       } else {
-        await base44.entities.Appointment.create(data);
+        const res = await base44.entities.Appointment.create(data);
+        appointmentId = res.id;
         toast.success('Cita creada');
       }
+
+      // Sync to Google Calendar if admin
+      if (isAdmin && appointmentId) {
+        try {
+          const appointment = { ...data, id: appointmentId };
+          await base44.functions.invoke('syncAppointmentToGoogleCalendar', { appointment });
+          toast.success('Sincronizado con Google Calendar');
+        } catch (err) {
+          console.error('Google Calendar sync error:', err);
+          toast.warning('Cita guardada, pero error al sincronizar con Google Calendar');
+        }
+      }
+
       setEditModal(false);
       load();
+      loadGoogleCalendarEvents();
     } catch (err) {
       toast.error('Error al guardar cita');
     }
@@ -135,13 +170,18 @@ export default function Calendar() {
   };
 
   const filtered = appointments.filter(a => !clientId || a.client_id === clientId);
+  const allEvents = [
+    ...filtered.map(a => ({ ...a, source: 'stenbot' })),
+    ...googleEvents.map(g => ({ ...g, source: 'google_calendar' }))
+  ];
+
   const daysInMonth = eachDayOfInterval({
     start: startOfMonth(currentMonth),
     end: endOfMonth(currentMonth)
   });
 
   const getAppointmentsForDay = (date) => {
-    return filtered.filter(a => isSameDay(new Date(a.start_time), date));
+    return allEvents.filter(a => isSameDay(new Date(a.start_time), date));
   };
 
   const typeLabelMap = {
@@ -171,6 +211,11 @@ export default function Calendar() {
           <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
             <ChevronRight className="w-4 h-4" />
           </Button>
+          {isAdmin && (
+            <Button variant="outline" onClick={loadGoogleCalendarEvents} disabled={syncingGoogleCal} className="gap-2">
+              {syncingGoogleCal ? '⏳ Sincronizando...' : '🔄 Google Calendar'}
+            </Button>
+          )}
           <Button onClick={() => openNewModal()} className="gap-2 ml-2">
             <Plus className="w-4 h-4" />
             Nueva cita
@@ -211,10 +256,15 @@ export default function Calendar() {
                     {dayAppts.map(appt => (
                       <div
                         key={appt.id}
-                        onClick={e => { e.stopPropagation(); openEditModal(appt); }}
-                        className="p-1 rounded bg-primary/10 text-primary text-xs font-medium line-clamp-2 cursor-pointer hover:bg-primary/20"
+                        onClick={e => { e.stopPropagation(); appt.source === 'stenbot' && openEditModal(appt); }}
+                        className={cn(
+                          "p-1 rounded text-xs font-medium line-clamp-2 cursor-pointer",
+                          appt.source === 'google_calendar'
+                            ? "bg-blue-100 text-blue-700 cursor-default"
+                            : "bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer"
+                        )}
                       >
-                        {format(new Date(appt.start_time), 'HH:mm')} - {appt.title}
+                        {format(new Date(appt.start_time), 'HH:mm')} - {appt.title} {appt.source === 'google_calendar' && '📅'}
                       </div>
                     ))}
                   </div>
@@ -229,7 +279,7 @@ export default function Calendar() {
       <div className="mt-6">
         <h3 className="text-lg font-semibold mb-3">Próximas citas</h3>
         <div className="space-y-2">
-          {filtered
+          {allEvents
             .filter(a => new Date(a.start_time) >= new Date())
             .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
             .slice(0, 10)
@@ -266,12 +316,19 @@ export default function Calendar() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button variant="outline" size="sm" onClick={() => openEditModal(appt)}>
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => deleteAppointment(appt.id)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  {appt.source === 'stenbot' && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => openEditModal(appt)}>
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => deleteAppointment(appt.id)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
+                  {appt.source === 'google_calendar' && (
+                    <span className="text-xs text-muted-foreground">📅 Google Calendar</span>
+                  )}
                 </div>
               </div>
             ))}
