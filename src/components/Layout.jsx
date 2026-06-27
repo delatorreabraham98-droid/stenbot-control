@@ -29,7 +29,7 @@ const clientNavItems = [
 ];
 
 export default function Layout() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const navItems = isAdmin ? adminNavItems : clientNavItems;
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -105,6 +105,23 @@ export default function Layout() {
 
       {!mobile && (
         <div className="p-3 border-t border-sidebar-border space-y-1">
+          {/* User info */}
+          {user && (
+            <div className={cn(
+              "flex items-center gap-2.5 px-2 py-2 mb-1 rounded-lg bg-sidebar-accent/50",
+              collapsed ? "justify-center" : ""
+            )}>
+              <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center flex-shrink-0 text-xs font-bold text-white">
+                {user.full_name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || '?'}
+              </div>
+              {!collapsed && (
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-white truncate">{user.full_name || 'Usuario'}</p>
+                  <p className="text-[10px] text-sidebar-foreground truncate">{user.email}</p>
+                </div>
+              )}
+            </div>
+          )}
           <button
             onClick={() => base44.auth.logout()}
             className={cn(
