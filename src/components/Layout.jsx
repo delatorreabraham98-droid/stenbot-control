@@ -26,6 +26,7 @@ const adminNavItems = [
 
 const clientNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/bot', icon: Bot, label: 'Mi Bot' },
   { to: '/conversations', icon: MessageSquare, label: 'Conversaciones' },
   { to: '/leads-kanban', icon: UserPlus, label: 'Leads' },
   { to: '/availability', icon: CalendarCheck, label: 'Disponibilidad' },

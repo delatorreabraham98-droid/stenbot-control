@@ -23,6 +23,7 @@ import Register from '@/pages/Register';
 import ClientDashboard from '@/pages/client/Dashboard';
 import ClientSettings from '@/pages/client/Settings';
 import ClientIntegrations from '@/pages/client/Integrations';
+import ClientBot from '@/pages/client/Bot';
 
 const AuthenticatedApp = () => {
   const {
@@ -94,6 +95,7 @@ const AuthenticatedApp = () => {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<ClientDashboard />} />
+        <Route path="/bot" element={<ClientBot />} />
         <Route path="/conversations" element={<Conversations />} />
         <Route path="/leads" element={<Leads />} />
         <Route path="/availability" element={<Availability />} />
