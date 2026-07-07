@@ -15,6 +15,7 @@ import Leads from '@/pages/Leads';
 import LeadsKanban from '@/pages/LeadsKanban';
 import Workflows from '@/pages/Workflows';
 import Calendar from '@/pages/Calendar';
+import Availability from '@/pages/Availability';
 import Knowledge from '@/pages/Knowledge';
 import SettingsPage from '@/pages/Settings';
 import Help from '@/pages/Help';
@@ -79,6 +80,7 @@ const AuthenticatedApp = () => {
           <Route path="/leads-kanban" element={<LeadsKanban />} />
           <Route path="/workflows" element={<Workflows />} />
           <Route path="/calendar" element={<Calendar />} />
+          <Route path="/availability" element={<Availability />} />
           <Route path="/knowledge" element={<Knowledge />} />
           <Route path="/help" element={<Help />} />
           <Route path="/settings" element={<SettingsPage />} />
@@ -94,6 +96,7 @@ const AuthenticatedApp = () => {
         <Route path="/" element={<ClientDashboard />} />
         <Route path="/conversations" element={<Conversations />} />
         <Route path="/leads" element={<Leads />} />
+        <Route path="/availability" element={<Availability />} />
         <Route path="/knowledge" element={<Knowledge />} />
         <Route path="/integrations" element={<ClientIntegrations />} />
         <Route path="/settings" element={<ClientSettings />} />

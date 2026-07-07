@@ -32,8 +32,27 @@
     "instagram_business_account_id": {
       "type": "string"
     },
+    "access_token": {
+      "type": "string",
+      "description": "Token permanente de acceso a la API de Meta"
+    },
     "webhook_verify_token": {
       "type": "string"
+    },
+    "webhook_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "verified",
+        "error"
+      ],
+      "default": "pending",
+      "description": "Estado de verificaci\u00f3n del webhook en Meta"
+    },
+    "api_version": {
+      "type": "string",
+      "default": "v21.0",
+      "description": "Versi\u00f3n de la Graph API de Meta"
     },
     "status": {
       "type": "string",

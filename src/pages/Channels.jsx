@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Plus, Radio, Copy, CheckCircle, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, Radio, Copy, CheckCircle, Pencil, Trash2, ExternalLink, Eye, EyeOff, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,8 @@ import { toast } from 'sonner';
 const emptyForm = {
   client_id: '', client_email: '', bot_id: '', type: 'whatsapp',
   meta_business_id: '', phone_number_id: '', page_id: '',
-  instagram_business_account_id: '', webhook_verify_token: '', status: 'inactive'
+  instagram_business_account_id: '', access_token: '',
+  webhook_verify_token: '', webhook_status: 'pending', api_version: 'v21.0', status: 'inactive'
 };
 
 const WEBHOOK_BASE = 'https://sten-bot-flow.base44.app/webhookWhatsApp';
@@ -29,6 +30,13 @@ export default function Channels() {
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(null);
+  const [showToken, setShowToken] = useState(false);
+
+  const webhookStatusMap = {
+    verified: { icon: Wifi, label: 'Conectado', className: 'text-green-600 bg-green-500/10' },
+    pending: { icon: AlertTriangle, label: 'Sin verificar', className: 'text-yellow-600 bg-yellow-500/10' },
+    error: { icon: WifiOff, label: 'Error', className: 'text-red-600 bg-red-500/10' },
+  };
 
   const load = () => {
     setLoading(true);
@@ -96,10 +104,11 @@ export default function Channels() {
         <p className="text-sm font-medium text-primary mb-1">Cómo conectar con Meta</p>
         <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
           <li>Crea el canal aquí y copia la URL del webhook</li>
+          <li>Pega el <strong>Access Token permanente</strong> generado en Meta for Developers</li>
           <li>Ve al portal de <strong>Meta for Developers</strong> → tu app → Webhooks</li>
           <li>Pega la URL y usa el Verify Token que configuraste</li>
           <li>Suscríbete al evento <code className="bg-muted px-1 rounded">messages</code></li>
-          <li>Cambia el estado del canal a "Activo"</li>
+          <li>Marca el estado del webhook como "Conectado" y el canal como "Activo"</li>
         </ol>
       </div>
 
@@ -115,9 +124,18 @@ export default function Channels() {
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{channelIcon(ch.type)}</span>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <StatusBadge status={ch.type} />
                       <StatusBadge status={ch.status} />
+                      {webhookStatusMap[ch.webhook_status] && (() => {
+                        const ws = webhookStatusMap[ch.webhook_status];
+                        const WIcon = ws.icon;
+                        return (
+                          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-lg ${ws.className}`}>
+                            <WIcon className="w-3 h-3" /> {ws.label}
+                          </span>
+                        );
+                      })()}
                     </div>
                     <p className="text-sm font-medium text-foreground mt-1">{clientName(ch.client_id)}</p>
                     <p className="text-xs text-muted-foreground">Bot: {botName(ch.bot_id)}</p>
@@ -138,9 +156,11 @@ export default function Channels() {
               </div>
 
               {ch.meta_business_id && (
-                <div className="mt-2 pt-2 border-t border-border flex gap-4 text-xs text-muted-foreground">
+                <div className="mt-2 pt-2 border-t border-border flex gap-4 text-xs text-muted-foreground flex-wrap">
                   <span>Business ID: <code className="font-mono">{ch.meta_business_id}</code></span>
                   {ch.page_id && <span>Page ID: <code className="font-mono">{ch.page_id}</code></span>}
+                  {ch.api_version && <span>API: <code className="font-mono">{ch.api_version}</code></span>}
+                  {ch.access_token && <span className="text-green-600">Token: configurado ✓</span>}
                 </div>
               )}
             </div>
@@ -220,6 +240,39 @@ export default function Channels() {
             <div className="space-y-1.5">
               <Label>Verify Token</Label>
               <Input value={form.webhook_verify_token} onChange={e => setForm(f => ({ ...f, webhook_verify_token: e.target.value }))} placeholder="mi_token_secreto_123" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Access Token (permanente)</Label>
+              <div className="flex gap-2">
+                <Input
+                  type={showToken ? 'text' : 'password'}
+                  value={form.access_token}
+                  onChange={e => setForm(f => ({ ...f, access_token: e.target.value }))}
+                  placeholder="EAAG..."
+                  className="font-mono text-xs"
+                />
+                <Button type="button" variant="outline" size="icon" onClick={() => setShowToken(s => !s)}>
+                  {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Token de acceso a la API de Meta para enviar mensajes.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Estado del Webhook</Label>
+                <Select value={form.webhook_status || 'pending'} onValueChange={v => setForm(f => ({ ...f, webhook_status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Sin verificar</SelectItem>
+                    <SelectItem value="verified">Conectado</SelectItem>
+                    <SelectItem value="error">Error</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Versión API Meta</Label>
+                <Input value={form.api_version || 'v21.0'} onChange={e => setForm(f => ({ ...f, api_version: e.target.value }))} placeholder="v21.0" className="font-mono" />
+              </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
