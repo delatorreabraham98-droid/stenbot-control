@@ -19,6 +19,11 @@ import Availability from '@/pages/Availability';
 import Knowledge from '@/pages/Knowledge';
 import SettingsPage from '@/pages/Settings';
 import Help from '@/pages/Help';
+import Analytics from '@/pages/Analytics';
+import Templates from '@/pages/Templates';
+import ActivityLogs from '@/pages/ActivityLogs';
+import Billing from '@/pages/Billing';
+import ClientProfile from '@/pages/ClientProfile';
 import Register from '@/pages/Register';
 import ClientDashboard from '@/pages/client/Dashboard';
 import ClientSettings from '@/pages/client/Settings';
@@ -83,6 +88,10 @@ const AuthenticatedApp = () => {
           <Route path="/calendar" element={<Calendar />} />
           <Route path="/availability" element={<Availability />} />
           <Route path="/knowledge" element={<Knowledge />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/templates" element={<Templates />} />
+          <Route path="/activity-logs" element={<ActivityLogs />} />
+          <Route path="/billing" element={<Billing />} />
           <Route path="/help" element={<Help />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
@@ -100,6 +109,8 @@ const AuthenticatedApp = () => {
         <Route path="/leads" element={<Leads />} />
         <Route path="/availability" element={<Availability />} />
         <Route path="/knowledge" element={<Knowledge />} />
+        <Route path="/templates" element={<Templates />} />
+        <Route path="/client-profile" element={<ClientProfile />} />
         <Route path="/integrations" element={<ClientIntegrations />} />
         <Route path="/settings" element={<ClientSettings />} />
       </Route>

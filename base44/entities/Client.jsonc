@@ -37,6 +37,42 @@
     },
     "notes": {
       "type": "string"
+    },
+    "billing_status": {
+      "type": "string",
+      "enum": [
+        "current",
+        "past_due",
+        "canceled",
+        "trialing"
+      ],
+      "default": "trialing",
+      "description": "Estado de la suscripci\u00f3n"
+    },
+    "message_limit": {
+      "type": "number",
+      "default": 1000,
+      "description": "L\u00edmite de mensajes mensuales seg\u00fan el plan"
+    },
+    "messages_used": {
+      "type": "number",
+      "default": 0,
+      "description": "Mensajes usados en el ciclo actual"
+    },
+    "monthly_amount": {
+      "type": "number",
+      "default": 0,
+      "description": "Monto mensual a facturar"
+    },
+    "next_billing_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Pr\u00f3xima fecha de facturaci\u00f3n"
+    },
+    "billing_cycle_start": {
+      "type": "string",
+      "format": "date",
+      "description": "Inicio del ciclo de facturaci\u00f3n"
     }
   },
   "required": [

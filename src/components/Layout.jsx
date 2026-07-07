@@ -4,7 +4,7 @@ import { base44 } from '@/api/base44Client';
 import {
   LayoutDashboard, Users, Bot, Radio, MessageSquare, UserPlus,
   BookOpen, Settings, ChevronLeft, ChevronRight, Zap, Menu, X, Plug, LogOut, Calendar as CalendarIcon,
-  HelpCircle, CalendarCheck
+  HelpCircle, CalendarCheck, BarChart3, FileText, History, CreditCard, UserCircle
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,10 @@ const adminNavItems = [
   { to: '/calendar', icon: CalendarIcon, label: 'Calendario' },
   { to: '/availability', icon: CalendarCheck, label: 'Disponibilidad' },
   { to: '/knowledge', icon: BookOpen, label: 'Conocimiento' },
+  { to: '/analytics', icon: BarChart3, label: 'Métricas' },
+  { to: '/templates', icon: FileText, label: 'Plantillas' },
+  { to: '/activity-logs', icon: History, label: 'Auditoría' },
+  { to: '/billing', icon: CreditCard, label: 'Facturación' },
   { to: '/help', icon: HelpCircle, label: 'Ayuda' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
 ];
@@ -31,7 +35,9 @@ const clientNavItems = [
   { to: '/leads-kanban', icon: UserPlus, label: 'Leads' },
   { to: '/availability', icon: CalendarCheck, label: 'Disponibilidad' },
   { to: '/knowledge', icon: BookOpen, label: 'Conocimiento' },
+  { to: '/templates', icon: FileText, label: 'Plantillas' },
   { to: '/integrations', icon: Plug, label: 'Integraciones' },
+  { to: '/client-profile', icon: UserCircle, label: 'Mi Perfil' },
   { to: '/settings', icon: Settings, label: 'Configuración' },
 ];
 

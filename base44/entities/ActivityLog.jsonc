@@ -1,0 +1,82 @@
+{
+  "name": "ActivityLog",
+  "type": "object",
+  "properties": {
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "create",
+        "update",
+        "delete",
+        "login",
+        "logout",
+        "config_change",
+        "message_send",
+        "status_change",
+        "billing_change"
+      ],
+      "description": "Tipo de acci\u00f3n realizada"
+    },
+    "entity_name": {
+      "type": "string",
+      "description": "Entidad afectada (Bot, Channel, Lead, etc.)"
+    },
+    "entity_id": {
+      "type": "string",
+      "description": "ID del registro afectado"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n legible de la acci\u00f3n"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario que realiz\u00f3 la acci\u00f3n"
+    },
+    "user_name": {
+      "type": "string",
+      "description": "Nombre del usuario"
+    },
+    "client_id": {
+      "type": "string",
+      "description": "Cliente relacionado (si aplica)"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "critical"
+      ],
+      "default": "info"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Datos adicionales de contexto",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "action_type",
+    "description",
+    "user_email"
+  ],
+  "rls": {
+    "create": {},
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
