@@ -520,17 +520,9 @@ Deno.serve(async (req) => {
             status: sendResult.ok ? 'sent' : 'failed',
           });
 
-          const newStatus = canHandle ? 'bot_active' : 'needs_human';
           const escalationMsg = !canHandle && bot?.human_escalation_message
             ? bot.human_escalation_message
             : undefined;
-
-          const updateData: any = {
-            last_message_at: now,
-            last_message_preview: botReply,
-            message_count: (conversation.message_count || 1) + 1,
-            status: newStatus,
-          };
 
           if (escalationMsg) {
             await sendWhatsAppMessage(phoneNumberId, senderPhone, escalationMsg, accessToken);
@@ -542,7 +534,27 @@ Deno.serve(async (req) => {
               message_type: 'text',
               status: 'sent',
             });
-            updateData.message_count = (updateData.message_count || 1) + 1;
+          }
+
+          // Re-read status one final time right before updating.
+          // The TTS + send + escalation steps above can take several seconds,
+          // during which the human may have toggled "Atención Humana" (needs_human)
+          // or closed the conversation. The bot must NEVER overwrite a manual
+          // human state back to bot_active — otherwise the next inbound message
+          // would reactivate the bot by itself.
+          const finalCheck = await base44.asServiceRole.entities.Conversation.filter({ id: conversation.id });
+          const finalStatus = finalCheck[0]?.status;
+          const newStatus = canHandle ? 'bot_active' : 'needs_human';
+
+          const updateData: any = {
+            last_message_at: now,
+            last_message_preview: botReply,
+            message_count: (conversation.message_count || 1) + (escalationMsg ? 2 : 1),
+          };
+          // Only change the status if the conversation is still in a bot-managed state.
+          // If the human set needs_human or closed it, preserve that intent.
+          if (finalStatus === 'open' || finalStatus === 'bot_active') {
+            updateData.status = newStatus;
           }
 
           await base44.asServiceRole.entities.Conversation.update(conversation.id, updateData);
