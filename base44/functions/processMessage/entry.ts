@@ -1,3 +1,4 @@
+// processMessage — usa entidades Base44 (sin Supabase). Historial vía entities.Message.
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 // ═══════════════════════════════════════════════════════════════

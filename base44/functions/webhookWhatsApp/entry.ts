@@ -1,3 +1,4 @@
+// webhookWhatsApp — usa entidades Base44 (sin Supabase). Historial/memoria vía entities.Message.
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
 const META_API_VERSION = 'v19.0';
