@@ -1,0 +1,126 @@
+{
+  "name": "Tool",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "Cliente due\u00f1o de la herramienta"
+    },
+    "client_email": {
+      "type": "string",
+      "format": "email"
+    },
+    "bot_id": {
+      "type": "string",
+      "description": "Bot espec\u00edfico (vac\u00edo = disponible para todos los bots del cliente)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre de la funci\u00f3n para la IA (ej: consultarDisponibilidad)"
+    },
+    "description": {
+      "type": "string",
+      "description": "Qu\u00e9 hace la herramienta (la IA usa esto para decidir cu\u00e1ndo llamarla)"
+    },
+    "endpoint_url": {
+      "type": "string",
+      "description": "URL de la API del cliente que se invocar\u00e1"
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "GET",
+        "POST"
+      ],
+      "default": "POST"
+    },
+    "auth_type": {
+      "type": "string",
+      "enum": [
+        "none",
+        "bearer",
+        "api_key"
+      ],
+      "default": "none",
+      "description": "Tipo de autenticaci\u00f3n hacia la API del cliente"
+    },
+    "auth_token": {
+      "type": "string",
+      "description": "Token o clave de autenticaci\u00f3n"
+    },
+    "custom_headers": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Headers HTTP adicionales clave-valor"
+    },
+    "parameters_schema": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Esquema JSON de par\u00e1metros que la IA debe proporcionar"
+    },
+    "response_path": {
+      "type": "string",
+      "description": "Ruta para extraer datos relevantes de la respuesta (ej: data.result)"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "client_id",
+    "name",
+    "description",
+    "endpoint_url"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

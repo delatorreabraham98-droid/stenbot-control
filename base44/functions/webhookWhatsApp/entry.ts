@@ -304,94 +304,7 @@ async function sendAudioMessage(phoneNumberId: string, to: string, audioData: Ui
   return { ...sendResult, mediaId };
 }
 
-async function generateBotResponse(
-  openAiKey: string,
-  botPersonality: string,
-  businessContext: string,
-  knowledgeItems: string,
-  conversationHistory: { role: string; content: string }[],
-  customerMessage: string
-): Promise<{ text: string; canHandle: boolean }> {
-  const systemPrompt = `Eres un asistente de atención al cliente. ${botPersonality ? 'Personalidad: ' + botPersonality : ''}
-
-${businessContext ? 'Contexto del negocio: ' + businessContext : ''}
-
-${knowledgeItems ? 'Información de la empresa:\n' + knowledgeItems : ''}
-
-Instrucciones:
-- Responde de forma natural y amigable.
-- Usa la información de la empresa para responder preguntas sobre productos, precios, horarios, etc.
-- Si no tienes información suficiente para responder, di que necesitas consultar con un asesor humano.
-- Si el cliente solicita explícitamente hablar con un humano o su solicitud requiere atención personal, indica "ESCALAR" al inicio de tu respuesta.
-- Mantén las respuestas breves y directas (máximo 3 párrafos).
-- Responde SIEMPRE en el mismo idioma en que el cliente escribió.`;
-
-  const messages: { role: string; content: string }[] = [
-    { role: 'system', content: systemPrompt },
-    ...conversationHistory.slice(-10),
-    { role: 'user', content: customerMessage },
-  ];
-
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15_000);
-
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages,
-        max_tokens: 500,
-        temperature: 0.7,
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timer);
-
-    if (!res.ok) {
-      const errData = await res.json();
-      console.error('OpenAI error', errData);
-      return { text: 'Lo siento, tengo problemas para procesar tu mensaje. Un asesor te atenderá en breve.', canHandle: false };
-    }
-
-    const data = await res.json();
-    let reply = data.choices?.[0]?.message?.content?.trim() || '';
-
-    const escalate = reply.startsWith('ESCALAR');
-    if (escalate) reply = reply.replace(/^ESCALAR\s*/i, '').trim();
-
-    return { text: reply, canHandle: !escalate };
-  } catch (err) {
-    console.error('OpenAI request failed', err);
-    return { text: 'Lo siento, tengo problemas para procesar tu mensaje. Un asesor te atenderá en breve.', canHandle: false };
-  }
-}
-
-async function buildConversationHistory(base44: any, conversationId: string): Promise<{ role: string; content: string }[]> {
-  try {
-    const msgs = await base44.asServiceRole.entities.Message.filter({ conversation_id: conversationId }, 'created_date', 20);
-    return msgs.map((m: any) => ({
-      role: m.sender_type === 'bot' ? 'assistant' : 'user',
-      content: m.message_text,
-    }));
-  } catch {
-    return [];
-  }
-}
-
-async function loadKnowledge(base44: any, clientId: string): Promise<string> {
-  try {
-    const items = await base44.asServiceRole.entities.KnowledgeItem.filter({ client_id: clientId, active: true });
-    return items.map((i: any) => `[${i.category}] ${i.title}: ${i.content}`).join('\n\n');
-  } catch {
-    return '';
-  }
-}
+// Motor IA desacoplado — ver función backend "processMessage" (Function Calling dinámico)
 
 function getAudioMessageInfo(msg: any): { mediaId: string | null; mimeType: string } {
   try {
@@ -557,17 +470,13 @@ Deno.serve(async (req) => {
           const bots = await base44.asServiceRole.entities.Bot.filter({ id: channel.bot_id });
           const bot = bots[0];
 
-          const knowledgeItems = await loadKnowledge(base44, channel.client_id);
-          const history = await buildConversationHistory(base44, conversation.id);
-
-          const { text: botReply, canHandle } = await generateBotResponse(
-            openAiKey,
-            bot?.bot_personality || '',
-            bot?.business_context || '',
-            knowledgeItems,
-            history,
-            customerText
-          );
+          const aiResult = await base44.asServiceRole.functions.invoke('processMessage', {
+            conversation_id: conversation.id,
+            bot_id: channel.bot_id,
+            client_id: channel.client_id,
+            user_message: customerText,
+          });
+          const { text: botReply, canHandle } = aiResult?.data ?? aiResult;
 
           const respondWithAudio = messageType === 'audio';
           let sendResult: { ok: boolean; error?: string };

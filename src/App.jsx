@@ -24,6 +24,7 @@ import Templates from '@/pages/Templates';
 import ActivityLogs from '@/pages/ActivityLogs';
 import Billing from '@/pages/Billing';
 import ClientProfile from '@/pages/ClientProfile';
+import Tools from '@/pages/Tools';
 import Register from '@/pages/Register';
 import ClientDashboard from '@/pages/client/Dashboard';
 import ClientSettings from '@/pages/client/Settings';
@@ -92,6 +93,7 @@ const AuthenticatedApp = () => {
           <Route path="/templates" element={<Templates />} />
           <Route path="/activity-logs" element={<ActivityLogs />} />
           <Route path="/billing" element={<Billing />} />
+          <Route path="/tools" element={<Tools />} />
           <Route path="/help" element={<Help />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
@@ -110,6 +112,7 @@ const AuthenticatedApp = () => {
         <Route path="/availability" element={<Availability />} />
         <Route path="/knowledge" element={<Knowledge />} />
         <Route path="/templates" element={<Templates />} />
+        <Route path="/tools" element={<Tools />} />
         <Route path="/client-profile" element={<ClientProfile />} />
         <Route path="/integrations" element={<ClientIntegrations />} />
         <Route path="/settings" element={<ClientSettings />} />
