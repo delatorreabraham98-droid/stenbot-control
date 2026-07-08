@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { MessageSquare, Search, AlertTriangle, X, Send, UserCheck, Mic, Volume2, RefreshCw } from 'lucide-react';
+import { MessageSquare, Search, AlertTriangle, X, Send, Mic, Volume2, RefreshCw } from 'lucide-react';
 import WhatsAppReplyModal from '@/components/conversations/WhatsAppReplyModal';
 import QuickReplies from '@/components/conversations/QuickReplies';
+import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -303,17 +304,14 @@ export default function Conversations() {
                   {isAdmin && <span className="text-xs text-muted-foreground">{clientName(selected.client_id)}</span>}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {selected.status !== 'bot_active' && (
-                  <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" onClick={() => updateStatus(selected.id, 'bot_active')}>
-                    Reactivar bot
-                  </Button>
-                )}
-                {selected.status !== 'needs_human' && (
-                  <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" onClick={() => updateStatus(selected.id, 'needs_human')}>
-                    <UserCheck className="w-3.5 h-3.5" />Escalar
-                  </Button>
-                )}
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <Switch
+                    checked={selected.status === 'needs_human'}
+                    onCheckedChange={(checked) => updateStatus(selected.id, checked ? 'needs_human' : 'bot_active')}
+                  />
+                  <span className="text-xs font-medium text-foreground">Atención Humana</span>
+                </label>
                 {selected.status !== 'closed' && (
                   <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" onClick={() => updateStatus(selected.id, 'closed')}>
                     <X className="w-3.5 h-3.5" />Cerrar
