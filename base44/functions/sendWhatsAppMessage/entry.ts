@@ -96,11 +96,18 @@ Deno.serve(async (req) => {
     });
 
     // 2. Update conversation
-    await base44.asServiceRole.entities.Conversation.update(conversation_id, {
+    // When a human replies manually, lock the conversation to manual mode (needs_human)
+    // so the bot doesn't auto-respond to the next inbound message from the customer.
+    // Skip if the conversation is already closed.
+    const updateData: any = {
       last_message_at: now,
       last_message_preview: previewText,
       message_count: (conversation.message_count || 0) + 1,
-    });
+    };
+    if (conversation.status !== 'closed') {
+      updateData.status = 'needs_human';
+    }
+    await base44.asServiceRole.entities.Conversation.update(conversation_id, updateData);
 
     // 3. Check Meta token
     const accessToken = Deno.env.get('META_ACCESS_TOKEN');

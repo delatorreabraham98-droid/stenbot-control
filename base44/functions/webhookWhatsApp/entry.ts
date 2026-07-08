@@ -465,6 +465,7 @@ Deno.serve(async (req) => {
         });
 
         const shouldRespond = conversation.status === 'open' || conversation.status === 'bot_active';
+        console.log(`[Webhook] Conversation ${conversation.id} status="${conversation.status}" shouldRespond=${shouldRespond}`);
 
         if (shouldRespond && openAiKey) {
           const bots = await base44.asServiceRole.entities.Bot.filter({ id: channel.bot_id });
