@@ -46,6 +46,7 @@ export default function Conversations() {
   const replyTextRef = useRef('');
   replyTextRef.current = replyText;
   const draftsRef = useRef({});
+  const loadRequestId = useRef(0);
 
   const clientId = isAdmin ? null : clientProfile?.id;
 
@@ -115,15 +116,27 @@ export default function Conversations() {
     if (selectedRef.current) {
       draftsRef.current[selectedRef.current.id] = replyTextRef.current;
     }
+    // Update ref synchronously so realtime subscription uses the correct conversation immediately
+    selectedRef.current = conv;
+    // Guard against race conditions: only the most recent load should update messages
+    const reqId = ++loadRequestId.current;
     setSelected(conv);
     setReplyText(draftsRef.current[conv.id] || '');
     setLoadingMessages(true);
     setMessages([]);
-    const msgs = await base44.entities.Message.filter({ conversation_id: conv.id }, 'created_date', 100);
-    setMessages(msgs);
-    setLoadingMessages(false);
-    // Instant scroll on first load
-    setTimeout(() => scrollToBottom('instant'), 50);
+    try {
+      const msgs = await base44.entities.Message.filter({ conversation_id: conv.id }, 'created_date', 100);
+      // Ignore stale responses from a previous conversation switch
+      if (reqId !== loadRequestId.current) return;
+      setMessages(msgs);
+      setLoadingMessages(false);
+      // Instant scroll on first load
+      setTimeout(() => scrollToBottom('instant'), 50);
+    } catch (err) {
+      if (reqId !== loadRequestId.current) return;
+      setLoadingMessages(false);
+      toast.error(`No se pudo cargar el historial: ${err.message}`);
+    }
   };
 
   // ── Send reply ────────────────────────────────────────────────
