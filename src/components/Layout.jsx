@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 import { cn } from '@/lib/utils';
+import ClientNav from '@/components/ClientNav';
 
 const adminNavItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -34,22 +35,40 @@ const adminNavItems = [
   { to: '/settings', icon: Settings, label: 'Configuración' },
 ];
 
-const clientNavItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/bot', icon: Bot, label: 'Mi Bot' },
-  { to: '/conversations', icon: MessageSquare, label: 'Conversaciones' },
-  { to: '/leads-kanban', icon: UserPlus, label: 'Leads' },
-  { to: '/availability', icon: CalendarCheck, label: 'Disponibilidad' },
-  { to: '/knowledge', icon: BookOpen, label: 'Conocimiento' },
-  { to: '/templates', icon: FileText, label: 'Plantillas' },
-  { to: '/tools', icon: Wrench, label: 'Herramientas' },
-  { to: '/apis', icon: Server, label: 'APIs' },
-  { to: '/playground', icon: FlaskConical, label: 'Playground' },
-  { to: '/variables', icon: Braces, label: 'Variables' },
-  { to: '/integrations', icon: Plug, label: 'Integraciones' },
-  { to: '/client-profile', icon: UserCircle, label: 'Mi Perfil' },
-  { to: '/settings', icon: Settings, label: 'Configuración' },
+const clientNavGroups = [
+  {
+    items: [
+      { to: '/', icon: LayoutDashboard, label: 'Inicio' },
+      { to: '/conversations', icon: MessageSquare, label: 'Conversaciones' },
+      { to: '/leads-kanban', icon: UserPlus, label: 'Leads' },
+      { to: '/availability', icon: CalendarCheck, label: 'Disponibilidad' },
+      { to: '/bot', icon: Bot, label: 'Mi Bot' },
+      { to: '/knowledge', icon: BookOpen, label: 'Conocimiento' },
+      { to: '/templates', icon: FileText, label: 'Plantillas' },
+    ],
+  },
+  {
+    label: 'Avanzado',
+    collapsible: true,
+    items: [
+      { to: '/integrations', icon: Plug, label: 'Integraciones' },
+      { to: '/tools', icon: Wrench, label: 'Herramientas' },
+      { to: '/apis', icon: Server, label: 'APIs' },
+      { to: '/variables', icon: Braces, label: 'Variables' },
+      { to: '/playground', icon: FlaskConical, label: 'Probar IA' },
+    ],
+  },
+  {
+    label: 'Cuenta',
+    items: [
+      { to: '/client-profile', icon: UserCircle, label: 'Mi Perfil' },
+      { to: '/settings', icon: Settings, label: 'Configuración' },
+    ],
+  },
 ];
+
+// Flat list for active-state detection and mobile
+const clientNavItems = clientNavGroups.flatMap(g => g.items);
 
 export default function Layout() {
   const { isAdmin, user } = useAuth();
@@ -96,34 +115,44 @@ export default function Layout() {
       </div>
 
       <nav className="flex-1 py-4 overflow-y-auto">
-        {navItems.map(({ to, icon: Icon, label }) => {
-          const active = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
-          const showBadge = isAdmin && to === '/conversations' && needsHumanCount > 0;
-          return (
-            <Link
-              key={to}
-              to={to}
-              onClick={() => setMobileOpen(false)}
-              className={cn(
-                "flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg mb-0.5 transition-all duration-150 group",
-                collapsed && !mobile ? "justify-center px-2" : "",
-                active
-                  ? "bg-sidebar-accent text-white"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
-              )}
-            >
-              <div className="relative">
-                <Icon className={cn("w-4 h-4 flex-shrink-0", active ? "text-primary" : "text-sidebar-foreground group-hover:text-primary")} />
-                {showBadge && (
-                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
-                    {needsHumanCount > 9 ? '9+' : needsHumanCount}
-                  </span>
+        {isAdmin ? (
+          navItems.map(({ to, icon: Icon, label }) => {
+            const active = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
+            const showBadge = to === '/conversations' && needsHumanCount > 0;
+            return (
+              <Link
+                key={to}
+                to={to}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg mb-0.5 transition-all duration-150 group",
+                  collapsed && !mobile ? "justify-center px-2" : "",
+                  active
+                    ? "bg-sidebar-accent text-white"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-white"
                 )}
-              </div>
-              {(!collapsed || mobile) && <span className="text-sm font-medium">{label}</span>}
-            </Link>
-          );
-        })}
+              >
+                <div className="relative">
+                  <Icon className={cn("w-4 h-4 flex-shrink-0", active ? "text-primary" : "text-sidebar-foreground group-hover:text-primary")} />
+                  {showBadge && (
+                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                      {needsHumanCount > 9 ? '9+' : needsHumanCount}
+                    </span>
+                  )}
+                </div>
+                {(!collapsed || mobile) && <span className="text-sm font-medium">{label}</span>}
+              </Link>
+            );
+          })
+        ) : (
+          <ClientNav
+            groups={clientNavGroups}
+            location={location}
+            collapsed={collapsed}
+            mobile={mobile}
+            onNavigate={() => setMobileOpen(false)}
+          />
+        )}
       </nav>
 
       {!mobile && (

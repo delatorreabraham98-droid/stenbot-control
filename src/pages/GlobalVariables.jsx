@@ -60,18 +60,18 @@ export default function GlobalVariables() {
   };
 
   const save = async () => {
-    if (!form.key.trim() || !form.value.trim()) { toast.error('Clave y valor son obligatorios'); return; }
+    if (!form.key.trim() || !form.value.trim()) { toast.error('El nombre y el contenido son obligatorios'); return; }
     try {
       const data = { ...form, key: form.key.trim(), client_id: clientId, client_email: clientProfile?.email };
-      if (editId) { await base44.entities.GlobalVariable.update(editId, data); toast.success('Variable actualizada'); }
-      else { await base44.entities.GlobalVariable.create(data); toast.success('Variable creada'); }
+      if (editId) { await base44.entities.GlobalVariable.update(editId, data); toast.success('Dato actualizado'); }
+      else { await base44.entities.GlobalVariable.create(data); toast.success('Dato guardado'); }
       setDialogOpen(false); isAdmin ? loadAll() : load();
     } catch (err) { toast.error(err.message); }
   };
 
   const remove = async (id) => {
-    if (!confirm('¿Eliminar esta variable?')) return;
-    try { await base44.entities.GlobalVariable.delete(id); toast.success('Variable eliminada'); isAdmin ? loadAll() : load(); }
+    if (!confirm('¿Eliminar este dato?')) return;
+    try { await base44.entities.GlobalVariable.delete(id); toast.success('Dato eliminado'); isAdmin ? loadAll() : load(); }
     catch (err) { toast.error(err.message); }
   };
 
@@ -85,20 +85,20 @@ export default function GlobalVariables() {
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <PageHeader
-        title="Variables Globales"
-        subtitle="Valores reutilizables que se sustituyen en URLs, headers y parámetros con la sintaxis {{KEY}}."
-        action={<Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" /> Nueva variable</Button>}
+        title="Datos Guardados"
+        subtitle="Guarda información de tu negocio para reutilizarla automáticamente en tus herramientas."
+        action={<Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" /> Nuevo dato</Button>}
       />
 
       <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg mb-6 text-sm text-muted-foreground">
         <Braces className="w-4 h-4 text-primary flex-shrink-0" />
-        Ejemplo: si creas la variable <code className="text-primary font-mono px-1">SUCURSAL_ID</code> con valor <code className="font-mono px-1">42</code>, puedes usar <code className="text-primary font-mono px-1">{`{{SUCURSAL_ID}}`}</code> en paths, headers y parámetros.
+        <span>Ejemplo: guardas <strong className="text-foreground">"Teléfono"</strong> con valor <strong className="text-foreground">"555-1234"</strong> y el bot lo usa automáticamente cuando lo necesita.</span>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 mb-6">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar variable..." className="pl-9" />
+          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..." className="pl-9" />
         </div>
         {isAdmin && (
           <Select value={selectedClient} onValueChange={setSelectedClient}>
@@ -114,7 +114,7 @@ export default function GlobalVariables() {
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
       ) : filtered.length === 0 ? (
-        <EmptyState icon={Braces} title="Sin variables" description="Crea variables para reutilizar valores en tus herramientas." />
+        <EmptyState icon={Braces} title="Sin datos guardados" description="Guarda información de tu negocio (teléfono, dirección, horarios) para que el bot la use automáticamente." />
       ) : (
         <div className="space-y-2">
           {filtered.map(v => (
@@ -143,19 +143,20 @@ export default function GlobalVariables() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editId ? 'Editar variable' : 'Nueva variable'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editId ? 'Editar dato' : 'Nuevo dato'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>Clave</Label>
-              <Input value={form.key} onChange={e => setForm(f => ({ ...f, key: e.target.value.toUpperCase().replace(/\s/g, '_') }))} placeholder="SUCURSAL_ID" className="font-mono" />
+              <Label>Nombre del dato</Label>
+              <Input value={form.key} onChange={e => setForm(f => ({ ...f, key: e.target.value.toUpperCase().replace(/\s/g, '_') }))} placeholder="TELEFONO" className="font-mono" />
+              <p className="text-xs text-muted-foreground">Usa un nombre corto, sin espacios (ej: DIRECCION, HORARIO)</p>
             </div>
             <div className="space-y-1.5">
-              <Label>Valor</Label>
-              <Input value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} placeholder="42" className="font-mono" />
+              <Label>Contenido</Label>
+              <Input value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} placeholder="Av. Reforma 123, CDMX" className="font-mono" />
             </div>
             <div className="space-y-1.5">
-              <Label>Descripción (opcional)</Label>
-              <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="ID de la sucursal principal" />
+              <Label>Nota (opcional)</Label>
+              <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Para uso interno" />
             </div>
             <label className="flex items-center gap-2 text-sm">
               <Switch checked={form.active} onCheckedChange={val => setForm(f => ({ ...f, active: val }))} />
