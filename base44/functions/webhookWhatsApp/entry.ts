@@ -479,6 +479,21 @@ Deno.serve(async (req) => {
           });
           const { text: botReply, canHandle } = aiResult?.data ?? aiResult;
 
+          // Re-read conversation status: the AI call takes several seconds,
+          // during which the user may have toggled "Atención Humana" (needs_human)
+          // or closed the conversation. If so, don't send the bot reply.
+          const freshConvs = await base44.asServiceRole.entities.Conversation.filter({ id: conversation.id });
+          const freshStatus = freshConvs[0]?.status;
+          if (freshStatus !== 'open' && freshStatus !== 'bot_active') {
+            console.log(`[Webhook] Status changed to "${freshStatus}" during AI processing — skipping bot reply`);
+            await base44.asServiceRole.entities.Conversation.update(conversation.id, {
+              last_message_at: now,
+              last_message_preview: customerText,
+              message_count: (conversation.message_count || 1),
+            });
+            continue;
+          }
+
           const respondWithAudio = messageType === 'audio';
           let sendResult: { ok: boolean; error?: string };
           let audioMediaId: string | undefined;
