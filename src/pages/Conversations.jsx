@@ -47,6 +47,7 @@ export default function Conversations() {
   replyTextRef.current = replyText;
   const draftsRef = useRef({});
   const loadRequestId = useRef(0);
+  const messagesCache = useRef({});
 
   const clientId = isAdmin ? null : clientProfile?.id;
 
@@ -122,15 +123,25 @@ export default function Conversations() {
     const reqId = ++loadRequestId.current;
     setSelected(conv);
     setReplyText(draftsRef.current[conv.id] || '');
-    setLoadingMessages(true);
-    setMessages([]);
+
+    // Show cached messages instantly if available (no blank flash on switching back)
+    const cached = messagesCache.current[conv.id];
+    if (cached) {
+      setMessages(cached);
+      setLoadingMessages(false);
+      setTimeout(() => scrollToBottom('instant'), 50);
+    } else {
+      setLoadingMessages(true);
+      setMessages([]);
+    }
+
     try {
       const msgs = await base44.entities.Message.filter({ conversation_id: conv.id }, 'created_date', 100);
       // Ignore stale responses from a previous conversation switch
       if (reqId !== loadRequestId.current) return;
+      messagesCache.current[conv.id] = msgs;
       setMessages(msgs);
       setLoadingMessages(false);
-      // Instant scroll on first load
       setTimeout(() => scrollToBottom('instant'), 50);
     } catch (err) {
       if (reqId !== loadRequestId.current) return;
