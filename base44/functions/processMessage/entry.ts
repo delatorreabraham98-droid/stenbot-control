@@ -187,6 +187,23 @@ INSTRUCCIONES DE PLANIFICACIÓN:
     const escalate = reply.startsWith('ESCALAR');
     if (escalate) reply = reply.replace(/^ESCALAR\s*/i, '').trim();
 
+    // Incrementar contador de mensajes usados del cliente
+    if (client_id) {
+      try {
+        const clients = await base44.asServiceRole.entities.Client.filter({ id: client_id });
+        const client = clients[0];
+        if (client) {
+          const used = (client.messages_used || 0) + 1;
+          const limit = client.message_limit || 1000;
+          await base44.asServiceRole.entities.Client.update(client.id, { messages_used: used });
+          // Si excede el límite, pausar el bot
+          if (used >= limit && client.status === 'active') {
+            await base44.asServiceRole.entities.Client.update(client.id, { status: 'paused', billing_status: 'past_due' });
+          }
+        }
+      } catch { /* best-effort tracking */ }
+    }
+
     return Response.json({
       text: reply,
       canHandle: !escalate,

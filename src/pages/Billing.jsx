@@ -10,13 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import StatusBadge from '@/components/ui/StatusBadge';
 import EmptyState from '@/components/ui/EmptyState';
-import { CreditCard, Users, DollarSign, MessageSquare, Loader2, Pencil, Search, TrendingUp } from 'lucide-react';
+import { CreditCard, Users, DollarSign, MessageSquare, Loader2, Pencil, Search, TrendingUp, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const PLANS = {
-  starter: { label: 'Starter', price: 0, messageLimit: 1000 },
+  starter: { label: 'Starter', price: 9.90, messageLimit: 1000 },
   pro: { label: 'Pro', price: 499, messageLimit: 10000 },
   enterprise: { label: 'Enterprise', price: 1499, messageLimit: 50000 },
 };
@@ -38,9 +38,13 @@ export default function Billing() {
   const [editClient, setEditClient] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(null);
 
   useEffect(() => {
     load();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('status') === 'success') toast.success('¡Suscripción activada! El pago se procesó correctamente.');
+    if (params.get('status') === 'cancelled') toast.info('Pago cancelado.');
   }, []);
 
   const load = async () => {
@@ -100,6 +104,22 @@ export default function Billing() {
   const onPlanChange = (plan) => {
     const p = PLANS[plan];
     setForm(f => ({ ...f, plan, monthly_amount: p.price, message_limit: p.messageLimit }));
+  };
+
+  const handleCheckout = async (clientId, plan) => {
+    if (window.self !== window.top) {
+      toast.error('El pago solo funciona desde la app publicada, no desde el editor.');
+      return;
+    }
+    setCheckoutLoading(plan);
+    try {
+      const res = await base44.functions.invoke('createCheckoutSession', { plan, client_id: clientId });
+      if (res.data?.url) window.location.href = res.data.url;
+    } catch (err) {
+      toast.error('Error al crear checkout: ' + err.message);
+    } finally {
+      setCheckoutLoading(null);
+    }
   };
 
   return (
@@ -174,7 +194,21 @@ export default function Billing() {
                         {c.next_billing_date ? format(new Date(c.next_billing_date), "d MMM yyyy", { locale: es }) : '—'}
                       </td>
                       <td className="px-4 py-3">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(c)}><Pencil className="w-4 h-4" /></Button>
+                        <div className="flex items-center gap-1">
+                          {c.billing_status !== 'current' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-green-600 hover:text-green-700"
+                              onClick={() => handleCheckout(c.id, c.plan || 'pro')}
+                              disabled={checkoutLoading === (c.plan || 'pro')}
+                              title="Suscribir vía Stripe"
+                            >
+                              {checkoutLoading === (c.plan || 'pro') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(c)}><Pencil className="w-4 h-4" /></Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -234,6 +268,9 @@ export default function Billing() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditClient(null)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => handleCheckout(editClient.id, form.plan)} disabled={checkoutLoading === form.plan}>
+              {checkoutLoading === form.plan ? <><Loader2 className="w-4 h-4 animate-spin" /> Procesando...</> : <><Zap className="w-4 h-4" /> Suscribir vía Stripe</>}
+            </Button>
             <Button onClick={save} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</Button>
           </DialogFooter>
         </DialogContent>
