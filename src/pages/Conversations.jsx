@@ -90,12 +90,12 @@ export default function Conversations() {
           if (exists) return prev;
           // Replace temp optimistic message if text matches
           const tempIdx = prev.findIndex(m => m.id.startsWith('temp-') && m.message_text === event.data.message_text);
-          if (tempIdx !== -1) {
-            const next = [...prev];
-            next[tempIdx] = event.data;
-            return next;
-          }
-          return [...prev, event.data];
+          const next = (tempIdx !== -1)
+            ? prev.map((m, i) => i === tempIdx ? event.data : m)
+            : [...prev, event.data];
+          // Keep cache in sync so switching back shows the new message
+          messagesCache.current[selectedRef.current.id] = next;
+          return next;
         });
       }
     });
@@ -166,7 +166,11 @@ export default function Conversations() {
       message_text: text,
       created_date: new Date().toISOString(),
     };
-    setMessages(prev => [...prev, tempMsg]);
+    setMessages(prev => {
+      const next = [...prev, tempMsg];
+      messagesCache.current[convId] = next;
+      return next;
+    });
 
     try {
       const res = await base44.functions.invoke('sendWhatsAppMessage', {
@@ -178,14 +182,22 @@ export default function Conversations() {
       } else if (res.data?.error && !res.data?.saved) {
         toast.error(`Error al enviar: ${res.data.error}`);
         setReplyText(text);
-        setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
+        setMessages(prev => {
+          const next = prev.filter(m => m.id !== tempMsg.id);
+          messagesCache.current[convId] = next;
+          return next;
+        });
         return;
       }
       load();
     } catch (err) {
       toast.error(`Error al enviar: ${err.response?.data?.error || err.message}`);
       setReplyText(text);
-      setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
+      setMessages(prev => {
+        const next = prev.filter(m => m.id !== tempMsg.id);
+        messagesCache.current[convId] = next;
+        return next;
+      });
     } finally {
       setSending(false);
     }
