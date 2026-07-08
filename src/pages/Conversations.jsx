@@ -434,7 +434,7 @@ export default function Conversations() {
           conversation={replyModal}
           open={!!replyModal}
           onClose={() => setReplyModal(null)}
-          onSent={() => { load(); if (selected?.id === replyModal.id) loadMessages(replyModal); }}
+          onSent={() => { load(); loadMessages(replyModal); }}
         />
       )}
     </div>
