@@ -160,10 +160,21 @@ export default function Conversations() {
   };
 
   const updateStatus = async (convId, status) => {
-    await base44.entities.Conversation.update(convId, { status });
-    toast.success('Estado actualizado');
-    load();
+    // Optimistic update so the UI reflects the change immediately
+    setConversations(prev => prev.map(c => c.id === convId ? { ...c, status } : c));
     if (selected?.id === convId) setSelected(prev => ({ ...prev, status }));
+    try {
+      await base44.entities.Conversation.update(convId, { status });
+      toast.success('Estado actualizado');
+    } catch (err) {
+      toast.error(`No se pudo guardar: ${err.response?.data?.error || err.message}`);
+      // Revert on failure
+      load();
+      if (selected?.id === convId) {
+        const fresh = conversations.find(c => c.id === convId);
+        if (fresh) setSelected(prev => ({ ...prev, status: fresh.status }));
+      }
+    }
   };
 
   const clientName = (id) => clients.find(c => c.id === id)?.business_name || '—';

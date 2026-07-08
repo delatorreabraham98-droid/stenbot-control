@@ -6,6 +6,11 @@
       "type": "string",
       "description": "ID del cliente due\u00f1o de la conversaci\u00f3n"
     },
+    "client_email": {
+      "type": "string",
+      "format": "email",
+      "description": "Email del cliente due\u00f1o (para permisos RLS)"
+    },
     "conversation_id": {
       "type": "string"
     },
