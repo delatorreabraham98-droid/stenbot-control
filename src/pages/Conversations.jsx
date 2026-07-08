@@ -43,6 +43,9 @@ export default function Conversations() {
   const messagesContainerRef = useRef(null);
   const selectedRef = useRef(null);
   selectedRef.current = selected;
+  const replyTextRef = useRef('');
+  replyTextRef.current = replyText;
+  const draftsRef = useRef({});
 
   const clientId = isAdmin ? null : clientProfile?.id;
 
@@ -108,7 +111,12 @@ export default function Conversations() {
 
   // ── Load messages for selected conversation ───────────────────
   const loadMessages = async (conv) => {
+    // Preserve the draft of the conversation we're leaving, restore the new one
+    if (selectedRef.current) {
+      draftsRef.current[selectedRef.current.id] = replyTextRef.current;
+    }
     setSelected(conv);
+    setReplyText(draftsRef.current[conv.id] || '');
     setLoadingMessages(true);
     setMessages([]);
     const msgs = await base44.entities.Message.filter({ conversation_id: conv.id }, 'created_date', 100);
