@@ -421,7 +421,11 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const clientEmail = channel.client_email;
+        let clientEmail = channel.client_email;
+        if (!clientEmail && channel.client_id) {
+          const clients = await base44.asServiceRole.entities.Client.filter({ id: channel.client_id });
+          if (clients[0]?.email) clientEmail = clients[0].email;
+        }
 
         const existingConvs = await base44.asServiceRole.entities.Conversation.filter({
           channel_id: channel.id,
