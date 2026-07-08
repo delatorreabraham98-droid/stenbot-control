@@ -1,0 +1,156 @@
+{
+  "name": "Api",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "Cliente due\u00f1o de la API"
+    },
+    "client_email": {
+      "type": "string",
+      "format": "email"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre descriptivo (ej: API Jard\u00edn Mediterr\u00e1neo)"
+    },
+    "base_url": {
+      "type": "string",
+      "description": "URL base (ej: https://api.midominio.com)"
+    },
+    "version": {
+      "type": "string",
+      "default": "v1",
+      "description": "Versi\u00f3n de la API (se a\u00f1ade como segmento en la URL)"
+    },
+    "auth_type": {
+      "type": "string",
+      "enum": [
+        "none",
+        "bearer",
+        "api_key",
+        "custom"
+      ],
+      "default": "none",
+      "description": "Mecanismo de autenticaci\u00f3n"
+    },
+    "auth_source": {
+      "type": "string",
+      "enum": [
+        "inline",
+        "env_var"
+      ],
+      "default": "inline",
+      "description": "inline = token en auth_token; env_var = leer de Deno.env.get(auth_env_var_name)"
+    },
+    "auth_token": {
+      "type": "string",
+      "description": "Token o clave (si auth_source=inline)"
+    },
+    "auth_env_var_name": {
+      "type": "string",
+      "description": "Nombre de variable de entorno (si auth_source=env_var)"
+    },
+    "auth_header_name": {
+      "type": "string",
+      "default": "Authorization",
+      "description": "Header donde se inyecta el token (ej: Authorization, X-API-Key)"
+    },
+    "auth_header_prefix": {
+      "type": "string",
+      "default": "Bearer",
+      "description": "Prefijo del header (Bearer, o vac\u00edo para clave directa)"
+    },
+    "custom_headers": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Headers HTTP adicionales clave-valor"
+    },
+    "timeout_ms": {
+      "type": "number",
+      "default": 15000,
+      "description": "Timeout en milisegundos"
+    },
+    "health_check_path": {
+      "type": "string",
+      "description": "Ruta para health check (ej: /health)"
+    },
+    "rate_limit_per_minute": {
+      "type": "number",
+      "default": 0,
+      "description": "L\u00edmite de llamadas por minuto (0 = sin l\u00edmite)"
+    },
+    "last_health_status": {
+      "type": "string",
+      "enum": [
+        "healthy",
+        "unhealthy",
+        "unknown"
+      ],
+      "default": "unknown"
+    },
+    "last_health_check": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "client_id",
+    "name",
+    "base_url"
+  ],
+  "rls": {
+    "create": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "read": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}

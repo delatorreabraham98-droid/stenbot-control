@@ -1,0 +1,95 @@
+{
+  "name": "ToolLog",
+  "type": "object",
+  "properties": {
+    "tool_id": {
+      "type": "string"
+    },
+    "tool_name": {
+      "type": "string"
+    },
+    "api_id": {
+      "type": "string"
+    },
+    "api_name": {
+      "type": "string"
+    },
+    "client_id": {
+      "type": "string"
+    },
+    "client_email": {
+      "type": "string"
+    },
+    "conversation_id": {
+      "type": "string"
+    },
+    "request_url": {
+      "type": "string"
+    },
+    "request_method": {
+      "type": "string"
+    },
+    "request_params": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "response_status": {
+      "type": "number"
+    },
+    "response_body": {
+      "type": "string",
+      "description": "Respuesta truncada a 2000 caracteres"
+    },
+    "duration_ms": {
+      "type": "number"
+    },
+    "error": {
+      "type": "string"
+    },
+    "cached": {
+      "type": "boolean",
+      "default": false
+    },
+    "retry_attempts": {
+      "type": "number",
+      "default": 0
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "planner",
+        "playground",
+        "health_check"
+      ],
+      "default": "planner"
+    }
+  },
+  "required": [
+    "tool_name"
+  ],
+  "rls": {
+    "create": {},
+    "read": {
+      "$or": [
+        {
+          "data.client_email": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

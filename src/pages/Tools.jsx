@@ -11,8 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Card } from '@/components/ui/card';
 import PageHeader from '@/components/ui/PageHeader';
 import EmptyState from '@/components/ui/EmptyState';
-import StatusBadge from '@/components/ui/StatusBadge';
-import { Plus, Pencil, Trash2, Wrench, Search, Loader2, Cpu, Zap, Link2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Wrench, Search, Loader2, Zap, Link2, FlaskConical, Server, Clock, Repeat, Database } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const PRESET_TEMPLATES = [
@@ -20,11 +20,10 @@ const PRESET_TEMPLATES = [
     name: 'consultarDisponibilidad',
     description: 'Consulta la disponibilidad de citas o reservaciones para una fecha específica',
     method: 'GET',
+    path: '/disponibilidad',
     parameters_schema: {
       type: 'object',
-      properties: {
-        fecha: { type: 'string', description: 'Fecha a consultar en formato YYYY-MM-DD' },
-      },
+      properties: { fecha: { type: 'string', description: 'Fecha a consultar en formato YYYY-MM-DD' } },
       required: ['fecha'],
     },
   },
@@ -32,12 +31,14 @@ const PRESET_TEMPLATES = [
     name: 'consultarPaquetes',
     description: 'Consulta los paquetes o servicios disponibles del negocio',
     method: 'GET',
+    path: '/paquetes',
     parameters_schema: { type: 'object', properties: {} },
   },
   {
     name: 'crearLead',
     description: 'Crea un nuevo lead o prospecto en el CRM del negocio con los datos del cliente',
     method: 'POST',
+    path: '/leads',
     parameters_schema: {
       type: 'object',
       properties: {
@@ -52,6 +53,7 @@ const PRESET_TEMPLATES = [
     name: 'crearCita',
     description: 'Crea una nueva cita o reservación',
     method: 'POST',
+    path: '/citas',
     parameters_schema: {
       type: 'object',
       properties: {
@@ -68,20 +70,26 @@ const PRESET_TEMPLATES = [
 const emptyForm = {
   name: '',
   description: '',
-  endpoint_url: '',
+  api_id: '',
+  path: '',
   method: 'POST',
-  auth_type: 'none',
-  auth_token: '',
   parameters_schema: '{"type":"object","properties":{}}',
   response_path: '',
+  prompt_hint: '',
   bot_id: '',
+  version: '1.0',
+  cache_ttl_seconds: 0,
+  retry_count: 0,
+  retry_delay_ms: 1000,
   active: true,
 };
 
 export default function Tools() {
   const { clientProfile, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [tools, setTools] = useState([]);
   const [bots, setBots] = useState([]);
+  const [apis, setApis] = useState([]);
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -97,9 +105,11 @@ export default function Tools() {
     if (isAdmin) {
       loadClients();
       loadAll();
+      loadAllApis();
     } else if (clientId) {
       load();
       loadBots();
+      loadApis(clientId);
     }
   }, [clientId, isAdmin]);
 
@@ -115,11 +125,12 @@ export default function Tools() {
     try {
       const data = await base44.entities.Tool.list('-created_date', 200);
       setTools(data);
-    } catch (err) {
-      toast.error('Error: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { toast.error('Error: ' + err.message); }
+    finally { setLoading(false); }
+  };
+
+  const loadAllApis = async () => {
+    try { setApis(await base44.entities.Api.list('-created_date', 200)); } catch {}
   };
 
   const load = async () => {
@@ -127,18 +138,16 @@ export default function Tools() {
     try {
       const data = await base44.entities.Tool.filter({ client_id: clientId }, '-created_date', 200);
       setTools(data);
-    } catch (err) {
-      toast.error('Error: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { toast.error('Error: ' + err.message); }
+    finally { setLoading(false); }
   };
 
   const loadBots = async () => {
-    try {
-      const data = await base44.entities.Bot.filter({ client_id: clientId });
-      setBots(data);
-    } catch {}
+    try { setBots(await base44.entities.Bot.filter({ client_id: clientId })); } catch {}
+  };
+
+  const loadApis = async (cId) => {
+    try { setApis(await base44.entities.Api.filter({ client_id: cId })); } catch {}
   };
 
   const filtered = tools.filter(t => {
@@ -157,13 +166,17 @@ export default function Tools() {
     setForm({
       name: t.name || '',
       description: t.description || '',
-      endpoint_url: t.endpoint_url || '',
+      api_id: t.api_id || '',
+      path: t.path || '',
       method: t.method || 'POST',
-      auth_type: t.auth_type || 'none',
-      auth_token: t.auth_token || '',
       parameters_schema: t.parameters_schema ? JSON.stringify(t.parameters_schema, null, 2) : '{"type":"object","properties":{}}',
       response_path: t.response_path || '',
+      prompt_hint: t.prompt_hint || '',
       bot_id: t.bot_id || '',
+      version: t.version || '1.0',
+      cache_ttl_seconds: t.cache_ttl_seconds || 0,
+      retry_count: t.retry_count || 0,
+      retry_delay_ms: t.retry_delay_ms || 1000,
       active: t.active,
     });
     setEditId(t.id);
@@ -176,41 +189,40 @@ export default function Tools() {
       name: preset.name,
       description: preset.description,
       method: preset.method,
+      path: preset.path,
       parameters_schema: JSON.stringify(preset.parameters_schema, null, 2),
     }));
   };
 
   const save = async () => {
-    if (!form.name.trim() || !form.description.trim() || !form.endpoint_url.trim()) {
-      toast.error('Nombre, descripción y endpoint son obligatorios');
+    if (!form.name.trim() || !form.description.trim() || !form.api_id || !form.path.trim()) {
+      toast.error('Nombre, descripción, API y ruta son obligatorios');
       return;
     }
-
     let parsedSchema;
-    try {
-      parsedSchema = JSON.parse(form.parameters_schema);
-    } catch {
-      toast.error('El esquema de parámetros no es JSON válido');
-      return;
-    }
+    try { parsedSchema = JSON.parse(form.parameters_schema); }
+    catch { toast.error('El esquema de parámetros no es JSON válido'); return; }
 
     setSaving(true);
     try {
       const data = {
         name: form.name.trim(),
         description: form.description.trim(),
-        endpoint_url: form.endpoint_url.trim(),
+        api_id: form.api_id,
+        path: form.path.trim(),
         method: form.method,
-        auth_type: form.auth_type,
-        auth_token: form.auth_token || '',
         parameters_schema: parsedSchema,
         response_path: form.response_path || '',
+        prompt_hint: form.prompt_hint || '',
         bot_id: form.bot_id || '',
+        version: form.version || '1.0',
+        cache_ttl_seconds: Number(form.cache_ttl_seconds) || 0,
+        retry_count: Number(form.retry_count) || 0,
+        retry_delay_ms: Number(form.retry_delay_ms) || 1000,
         active: form.active,
         client_id: clientId,
         client_email: clientProfile?.email,
       };
-
       if (editId) {
         await base44.entities.Tool.update(editId, data);
         toast.success('Herramienta actualizada');
@@ -219,46 +231,36 @@ export default function Tools() {
         toast.success('Herramienta creada');
       }
       setDialogOpen(false);
-      load();
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setSaving(false);
-    }
+      isAdmin ? loadAll() : load();
+    } catch (err) { toast.error(err.message); }
+    finally { setSaving(false); }
   };
 
   const remove = async (id) => {
     if (!confirm('¿Eliminar esta herramienta?')) return;
-    try {
-      await base44.entities.Tool.delete(id);
-      toast.success('Herramienta eliminada');
-      load();
-    } catch (err) {
-      toast.error(err.message);
-    }
+    try { await base44.entities.Tool.delete(id); toast.success('Herramienta eliminada'); isAdmin ? loadAll() : load(); }
+    catch (err) { toast.error(err.message); }
   };
 
   const toggleActive = async (t) => {
-    try {
-      await base44.entities.Tool.update(t.id, { active: !t.active });
-      load();
-    } catch (err) {
-      toast.error(err.message);
-    }
+    try { await base44.entities.Tool.update(t.id, { active: !t.active }); isAdmin ? loadAll() : load(); }
+    catch (err) { toast.error(err.message); }
   };
+
+  const getApiName = (apiId) => apis.find(a => a.id === apiId)?.name || 'API no encontrada';
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <PageHeader
         title="Herramientas"
-        subtitle="Registra endpoints que la IA usará automáticamente para responder a tus clientes"
+        subtitle="Cada herramienta apunta a un endpoint de una API registrada. El Planner IA decide cuándo usarlas."
         action={<Button onClick={openNew} className="gap-2"><Plus className="w-4 h-4" /> Nueva herramienta</Button>}
       />
 
       <div className="flex items-center gap-3 p-4 bg-primary/5 border border-primary/20 rounded-xl mb-6">
-        <Cpu className="w-5 h-5 text-primary flex-shrink-0" />
+        <Server className="w-5 h-5 text-primary flex-shrink-0" />
         <p className="text-sm text-muted-foreground">
-          La IA decidirá cuándo usar cada herramienta según la intención del usuario. No necesitas crear flujos — la IA consulta tus APIs antes de responder.
+          Las herramientas ahora se conectan a APIs registradas. Ve a <button onClick={() => navigate('/apis')} className="text-primary font-semibold underline">APIs</button> para registrar una API, o a <button onClick={() => navigate('/playground')} className="text-primary font-semibold underline">Playground</button> para probar tus herramientas.
         </p>
       </div>
 
@@ -281,11 +283,7 @@ export default function Tools() {
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={Wrench}
-          title="Sin herramientas"
-          description="Registra tu primera herramienta para que la IA pueda consultar tu API."
-        />
+        <EmptyState icon={Wrench} title="Sin herramientas" description="Registra tu primera herramienta apuntando a una API registrada." />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filtered.map(t => (
@@ -297,10 +295,13 @@ export default function Tools() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-sm text-foreground font-mono">{t.name}</h3>
-                    <span className="text-xs text-muted-foreground">{t.method} · {t.auth_type}</span>
+                    <span className="text-xs text-muted-foreground">{t.method} · v{t.version || '1.0'}</span>
                   </div>
                 </div>
                 <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/playground?tool=${t.id}`)} title="Probar en Playground">
+                    <FlaskConical className="w-4 h-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleActive(t)} title={t.active ? 'Activa' : 'Inactiva'}>
                     <Switch checked={t.active} className="scale-75 pointer-events-none" />
                   </Button>
@@ -309,15 +310,27 @@ export default function Tools() {
                 </div>
               </div>
               <p className="text-sm text-muted-foreground mb-2">{t.description}</p>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
                 <Link2 className="w-3 h-3" />
-                <span className="truncate font-mono">{t.endpoint_url}</span>
+                <span className="truncate font-mono">{getApiName(t.api_id)}{t.path}</span>
               </div>
-              {t.bot_id && (
-                <span className="inline-block mt-2 text-xs px-2 py-0.5 rounded bg-muted">
-                  {bots.find(b => b.id === t.bot_id)?.name || 'Bot específico'}
-                </span>
-              )}
+              <div className="flex flex-wrap gap-1.5">
+                {t.cache_ttl_seconds > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-600">
+                    <Database className="w-3 h-3" /> Caché {t.cache_ttl_seconds}s
+                  </span>
+                )}
+                {t.retry_count > 0 && (
+                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-amber-50 text-amber-600">
+                    <Repeat className="w-3 h-3" /> Retry {t.retry_count}x
+                  </span>
+                )}
+                {t.bot_id && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-muted">
+                    {bots.find(b => b.id === t.bot_id)?.name || 'Bot específico'}
+                  </span>
+                )}
+              </div>
             </Card>
           ))}
         </div>
@@ -325,22 +338,14 @@ export default function Tools() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editId ? 'Editar herramienta' : 'Nueva herramienta'}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{editId ? 'Editar herramienta' : 'Nueva herramienta'}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             {!editId && (
               <div className="space-y-1.5">
                 <Label>Plantillas rápidas</Label>
                 <div className="flex flex-wrap gap-2">
                   {PRESET_TEMPLATES.map(p => (
-                    <button
-                      key={p.name}
-                      onClick={() => applyPreset(p)}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary transition-colors font-mono"
-                    >
-                      {p.name}()
-                    </button>
+                    <button key={p.name} onClick={() => applyPreset(p)} className="text-xs px-3 py-1.5 rounded-lg bg-muted hover:bg-primary/10 hover:text-primary transition-colors font-mono">{p.name}()</button>
                   ))}
                 </div>
               </div>
@@ -352,10 +357,10 @@ export default function Tools() {
               </div>
               <div className="space-y-1.5">
                 <Label>Bot (opcional)</Label>
-                <Select value={form.bot_id} onValueChange={v => setForm(f => ({ ...f, bot_id: v }))}>
+                <Select value={form.bot_id || 'all'} onValueChange={v => setForm(f => ({ ...f, bot_id: v === 'all' ? '' : v }))}>
                   <SelectTrigger><SelectValue placeholder="Todos los bots" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={null}>Todos los bots</SelectItem>
+                    <SelectItem value="all">Todos los bots</SelectItem>
                     {bots.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -366,10 +371,25 @@ export default function Tools() {
               <Textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={2} placeholder="Consulta la disponibilidad de citas para una fecha específica" />
               <p className="text-xs text-muted-foreground">La IA usa esta descripción para decidir cuándo invocar la herramienta.</p>
             </div>
+            <div className="space-y-1.5">
+              <Label>API registrada</Label>
+              {apis.length === 0 ? (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+                  No hay APIs registradas. <button onClick={() => navigate('/apis')} className="font-semibold underline">Registrar API</button>
+                </div>
+              ) : (
+                <Select value={form.api_id} onValueChange={v => setForm(f => ({ ...f, api_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecciona una API" /></SelectTrigger>
+                  <SelectContent>
+                    {apis.map(a => <SelectItem key={a.id} value={a.id}>{a.name} — {a.base_url}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Endpoint URL</Label>
-                <Input value={form.endpoint_url} onChange={e => setForm(f => ({ ...f, endpoint_url: e.target.value }))} placeholder="https://mi-api.com/disponibilidad" className="font-mono text-sm" />
+                <Label>Ruta del endpoint</Label>
+                <Input value={form.path} onChange={e => setForm(f => ({ ...f, path: e.target.value }))} placeholder="/disponibilidad" className="font-mono text-sm" />
               </div>
               <div className="space-y-1.5">
                 <Label>Método</Label>
@@ -382,24 +402,10 @@ export default function Tools() {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Autenticación</Label>
-                <Select value={form.auth_type} onValueChange={v => setForm(f => ({ ...f, auth_type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin auth</SelectItem>
-                    <SelectItem value="bearer">Bearer Token</SelectItem>
-                    <SelectItem value="api_key">API Key</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {form.auth_type !== 'none' && (
-                <div className="space-y-1.5">
-                  <Label>Token / API Key</Label>
-                  <Input type="password" value={form.auth_token} onChange={e => setForm(f => ({ ...f, auth_token: e.target.value }))} placeholder="tu-token-secreto" className="font-mono text-sm" />
-                </div>
-              )}
+            <div className="space-y-1.5">
+              <Label>Prompt de uso (opcional)</Label>
+              <Textarea value={form.prompt_hint} onChange={e => setForm(f => ({ ...f, prompt_hint: e.target.value }))} rows={2} placeholder="Úsala cuando el cliente pregunte por fechas disponibles o quiera reservar" />
+              <p className="text-xs text-muted-foreground">Guía a la IA sobre cuándo y por qué usar esta herramienta.</p>
             </div>
             <div className="space-y-1.5">
               <Label>Esquema de parámetros (JSON)</Label>
@@ -409,6 +415,20 @@ export default function Tools() {
               <Label>Ruta de respuesta (opcional)</Label>
               <Input value={form.response_path} onChange={e => setForm(f => ({ ...f, response_path: e.target.value }))} placeholder="data.result" className="font-mono text-sm" />
               <p className="text-xs text-muted-foreground">Extrae solo la parte relevante de la respuesta (notación punto).</p>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1"><Database className="w-3 h-3" /> Caché (seg)</Label>
+                <Input type="number" value={form.cache_ttl_seconds} onChange={e => setForm(f => ({ ...f, cache_ttl_seconds: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1"><Repeat className="w-3 h-3" /> Reintentos</Label>
+                <Input type="number" value={form.retry_count} onChange={e => setForm(f => ({ ...f, retry_count: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1"><Clock className="w-3 h-3" /> Delay (ms)</Label>
+                <Input type="number" value={form.retry_delay_ms} onChange={e => setForm(f => ({ ...f, retry_delay_ms: e.target.value }))} placeholder="1000" />
+              </div>
             </div>
             <label className="flex items-center gap-2 text-sm">
               <Switch checked={form.active} onCheckedChange={v => setForm(f => ({ ...f, active: v }))} />

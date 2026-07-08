@@ -14,6 +14,10 @@
       "type": "string",
       "description": "Bot espec\u00edfico (vac\u00edo = disponible para todos los bots del cliente)"
     },
+    "api_id": {
+      "type": "string",
+      "description": "API registrada a la que apunta la herramienta"
+    },
     "name": {
       "type": "string",
       "description": "Nombre de la funci\u00f3n para la IA (ej: consultarDisponibilidad)"
@@ -22,9 +26,9 @@
       "type": "string",
       "description": "Qu\u00e9 hace la herramienta (la IA usa esto para decidir cu\u00e1ndo llamarla)"
     },
-    "endpoint_url": {
+    "path": {
       "type": "string",
-      "description": "URL de la API del cliente que se invocar\u00e1"
+      "description": "Ruta del endpoint relativa a la API (ej: /disponibilidad)"
     },
     "method": {
       "type": "string",
@@ -34,25 +38,6 @@
       ],
       "default": "POST"
     },
-    "auth_type": {
-      "type": "string",
-      "enum": [
-        "none",
-        "bearer",
-        "api_key"
-      ],
-      "default": "none",
-      "description": "Tipo de autenticaci\u00f3n hacia la API del cliente"
-    },
-    "auth_token": {
-      "type": "string",
-      "description": "Token o clave de autenticaci\u00f3n"
-    },
-    "custom_headers": {
-      "type": "object",
-      "additionalProperties": true,
-      "description": "Headers HTTP adicionales clave-valor"
-    },
     "parameters_schema": {
       "type": "object",
       "additionalProperties": true,
@@ -60,7 +45,31 @@
     },
     "response_path": {
       "type": "string",
-      "description": "Ruta para extraer datos relevantes de la respuesta (ej: data.result)"
+      "description": "Ruta para extraer datos relevantes (ej: data.result)"
+    },
+    "prompt_hint": {
+      "type": "string",
+      "description": "Gu\u00eda para la IA: cu\u00e1ndo y por qu\u00e9 usar esta herramienta"
+    },
+    "version": {
+      "type": "string",
+      "default": "1.0",
+      "description": "Versi\u00f3n de la herramienta"
+    },
+    "cache_ttl_seconds": {
+      "type": "number",
+      "default": 0,
+      "description": "TTL de cach\u00e9 en segundos (0 = sin cach\u00e9)"
+    },
+    "retry_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Reintentos autom\u00e1ticos ante error transitorio"
+    },
+    "retry_delay_ms": {
+      "type": "number",
+      "default": 1000,
+      "description": "Delay entre reintentos en milisegundos"
     },
     "active": {
       "type": "boolean",
@@ -69,9 +78,10 @@
   },
   "required": [
     "client_id",
+    "api_id",
     "name",
     "description",
-    "endpoint_url"
+    "path"
   ],
   "rls": {
     "create": {
