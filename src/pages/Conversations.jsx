@@ -136,9 +136,12 @@ export default function Conversations() {
     }
 
     try {
-      const msgs = await base44.entities.Message.filter({ conversation_id: conv.id }, 'created_date', 100);
-      // Ignore stale responses from a previous conversation switch
+      // Fetch the MOST RECENT 100 (descending), then reverse so the chat shows
+      // oldest → newest chronologically. Ascending sort + limit would return
+      // the oldest 100, hiding recent messages in long conversations.
+      const recent = await base44.entities.Message.filter({ conversation_id: conv.id }, '-created_date', 100);
       if (reqId !== loadRequestId.current) return;
+      const msgs = recent.slice().reverse();
       messagesCache.current[conv.id] = msgs;
       setMessages(msgs);
       setLoadingMessages(false);
