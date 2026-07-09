@@ -365,10 +365,15 @@ export default function Conversations() {
               <div className="flex items-center gap-3">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <Switch
-                    checked={selected.status === 'needs_human'}
-                    onCheckedChange={(checked) => updateStatus(selected.id, checked ? 'needs_human' : 'bot_active')}
+                    checked={selected.status === 'open' || selected.status === 'bot_active'}
+                    onCheckedChange={(checked) => updateStatus(selected.id, checked ? 'bot_active' : 'needs_human')}
                   />
-                  <span className="text-xs font-medium text-foreground">Atención Humana</span>
+                  <span className={cn(
+                    "text-xs font-medium",
+                    (selected.status === 'open' || selected.status === 'bot_active') ? "text-foreground" : "text-amber-600"
+                  )}>
+                    {(selected.status === 'open' || selected.status === 'bot_active') ? '🤖 Bot activo' : '👤 Atención humana'}
+                  </span>
                 </label>
                 {selected.status !== 'closed' && (
                   <Button variant="outline" size="sm" className="gap-1.5 text-xs h-8" onClick={() => updateStatus(selected.id, 'closed')}>
